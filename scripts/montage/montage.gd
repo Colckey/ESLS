@@ -70,6 +70,8 @@ var status: Label
 var ergebnis: RichTextLabel
 var datei_dialog: FileDialog
 var werkzeug_knoepfe := {}
+var name_feld: LineEdit
+var geladene_meta := {}
 
 var mat_nym: StandardMaterial3D
 var mat_steuer: StandardMaterial3D
@@ -206,7 +208,15 @@ func _ui() -> void:
 	mm.value_changed.connect(func(v: float) -> void: abisolier_mm = v)
 	leiste2.add_child(mm)
 
-	for a in [["Prüfen", _pruefen], ["Speichern", _speichern_dialog], ["Laden", _laden_dialog], ["Neu", _neues_projekt]]:
+	var name_lbl := Label.new()
+	name_lbl.text = "Name:"
+	leiste2.add_child(name_lbl)
+	name_feld = LineEdit.new()
+	name_feld.placeholder_text = "Vor- und Nachname"
+	name_feld.custom_minimum_size = Vector2(160, 0)
+	leiste2.add_child(name_feld)
+	for a in [["Prüfen", _pruefen], ["Speichern", _speichern_dialog], ["Laden", _laden_dialog], ["Neu", _neues_projekt],
+			["Lehrermodus", _lehrermodus]]:
 		var b := Button.new()
 		b.text = a[0]
 		b.pressed.connect(a[1])
@@ -231,6 +241,9 @@ func _ui() -> void:
 	datei_dialog.file_selected.connect(_datei_gewaehlt)
 	layer.add_child(datei_dialog)
 	_werkzeug_waehlen(Werkzeug.AUSWAHL)
+
+func _lehrermodus() -> void:
+	get_tree().change_scene_to_file("res://lehrer.tscn")
 
 # ---------------------------------------------------------------- Projekt
 
@@ -683,7 +696,10 @@ func _datei_gewaehlt(pfad: String) -> void:
 	if _dialog_speichern:
 		if not pfad.ends_with(".esim"):
 			pfad += ".esim"
-		var err := Projektdatei.speichern(circuit, pfad, {"erstellt": Time.get_datetime_string_from_system()})
+		var meta := geladene_meta.duplicate()
+		meta["schueler"] = name_feld.text
+		meta["erstellt"] = Time.get_datetime_string_from_system()
+		var err := Projektdatei.speichern(circuit, pfad, meta)
 		_status("Gespeichert: %s" % pfad if err == OK else "Speichern fehlgeschlagen (Fehler %d)." % err)
 	else:
 		var d := Projektdatei.laden(pfad)
@@ -691,6 +707,8 @@ func _datei_gewaehlt(pfad: String) -> void:
 			_status(d.fehler)
 			return
 		circuit = d.circuit
+		geladene_meta = d.meta
+		name_feld.text = d.meta.get("schueler", "")
 		_alles_neu_zeichnen()
 		ergebnis.text = "" if d.unveraendert else "[color=orange]Hinweis: Datei wurde außerhalb von ESLS verändert.[/color]"
 		_status("Geladen: %s" % pfad)

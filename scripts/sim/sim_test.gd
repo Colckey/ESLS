@@ -35,6 +35,7 @@ func _ready() -> void:
 
 	_schuetz_selbsthaltung()
 	_kreuzschaltung()
+	_bewertung()
 	_speichern_laden()
 	ausgabe += "\n%s" % ("ALLE TESTS OK" if fehlgeschlagen == 0 else "%d TEST(S) FEHLGESCHLAGEN" % fehlgeschlagen)
 	print(ausgabe)
@@ -133,3 +134,17 @@ func _kreuzschaltung() -> void:
 		an.append("lampe1" in c.pruefen().lampen_an)
 	var r := c.pruefen()
 	_check("Kreuzschaltung: jede Betätigung schaltet um %s" % [an], r, an[0] != an[1] and an[1] != an[2] and an[2] != an[3])
+
+func _bewertung() -> void:
+	var muster := aufbau()
+	var richtig := aufbau()
+	var b := Bewertung.bewerten(richtig, muster)
+	_check("Bewertung: richtige Lösung = 100 Punkte, Note 1, Funktion ok", {"ausgeloest": [], "lampen_an": [], "fehler": b.fehler},
+		b.punkte == 100 and b.note == 1 and b.funktion_ok == true)
+	var falsch := aufbau()
+	falsch.leitungen[3].adern[1].nach = "dose_L:e"   # Schaltdraht auf L-Klemme statt Lampenklemme: Lampe bleibt immer aus
+	b = Bewertung.bewerten(falsch, muster)
+	_check("Bewertung: Lampe brennt dauernd -> Funktion falsch, Abzug", {"ausgeloest": [], "lampen_an": [], "fehler": b.fehler},
+		b.funktion_ok == false and b.punkte <= 60)
+	var tab: Dictionary = b.tabelle
+	_check("Bewertung: Funktionstabelle hat 2 Zeilen (1 Schalter)", {"ausgeloest": [], "lampen_an": [], "fehler": []}, tab.zeilen.size() == 2)

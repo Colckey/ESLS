@@ -25,3 +25,7 @@ Bitte kurz durchsehen. Alles lässt sich leicht ändern.
 | 19 | Zeitrelais vorerst ansprechverzögert ohne echte Zeit: beim Prüfen gilt die Zeit als abgelaufen | Statische Prüfung reicht für Verdrahtungsfehler | Zeitlauf mit Uhr (später, für Treppenlicht) |
 | 20 | Taster werden per Leertaste gedrückt/losgelassen (zweimal drücken) | Einfach | Taste gedrückt halten |
 | 21 | Stromstoßschalter und Treppenlichtautomat noch nicht drin | Brauchen echte Zeit-/Flankenlogik | Nächster Ausbauschritt |
+| 22 | Bewertung: Start 100 Punkte, -10 je Fehler, -3 je Warnung, -40 wenn die Funktion nicht zur Musterlösung passt; Note nach IHK-Schlüssel (92/81/67/50/30) | Transparent und für Lehrer nachvollziehbar | Gewichtung pro Aufgabe einstellbar |
+| 23 | Funktionsvergleich: alle Schalterstellungen werden durchprobiert; verglichen wird die Anzahl leuchtender Lampen und ob etwas auslöst, Schalter werden über alle Zuordnungen gleichen Typs abgeglichen | Schüler dürfen Bauteile anders benennen/anordnen | Exakter Vergleich pro Lampe |
+| 24 | Schülername wird beim Speichern in die Datei geschrieben (Feld „Name“) | Lehrer sieht, von wem die Datei ist | Anmeldung |
+| 25 | Windows-Export als eine einzige portable .exe (PCK eingebettet), Testszenen werden nicht mit exportiert | Einfach per USB-Stick verteilbar | Installer |

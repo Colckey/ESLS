@@ -71,6 +71,15 @@ func geraet_hinzufuegen(id: String, typ: String, pos := Vector3.ZERO, param := {
 	if typ in ["schuetz", "zeitrelais"]:
 		zustand[id] = {"an": false}   # Spulenzustand bleibt erhalten (Selbsthaltung)
 
+## Tiefe Kopie (z. B. fuer die Bewertung, damit die Schuelerdatei unveraendert bleibt)
+func kopie() -> Circuit:
+	var c := Circuit.new()
+	c.geraete = geraete.duplicate(true)
+	c.leitungen = leitungen.duplicate(true)
+	c.zustand = zustand.duplicate(true)
+	c.bohrungen = bohrungen.duplicate()
+	return c
+
 func leitung_hinzufuegen(l: Dictionary) -> void:
 	leitungen.append(l)
 
