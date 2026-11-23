@@ -11,7 +11,7 @@ const BOARD_H := 0.8
 const RASTER := 0.01          # 1 cm Fangraster
 const BOHR_FANG := 0.015      # Schelle/Geraet sucht Bohrung im Umkreis von 1,5 cm
 
-enum Werkzeug { AUSWAHL, BOHRER, BAUTEIL, LEITUNG, SCHELLE, SEITENSCHNEIDER, ABMANTELN, ABISOLIEREN }
+enum Werkzeug { AUSWAHL, BOHRER, BAUTEIL, LEITUNG, SCHELLE, SEITENSCHNEIDER, ABMANTELN, ABISOLIEREN, ANKLEMMEN }
 
 ## Aderfarben fuer die Darstellung
 const ADERFARBE := {
@@ -161,7 +161,8 @@ func _ui() -> void:
 
 	for w in [[Werkzeug.AUSWAHL, "Auswahl"], [Werkzeug.BOHRER, "Bohrmaschine"], [Werkzeug.BAUTEIL, "Bauteil setzen"],
 			[Werkzeug.LEITUNG, "Leitung verlegen"], [Werkzeug.SCHELLE, "Iso-Schelle"], [Werkzeug.SEITENSCHNEIDER, "Seitenschneider"],
-			[Werkzeug.ABMANTELN, "Abmantelungswerkzeug"], [Werkzeug.ABISOLIEREN, "Abisolierzange"]]:
+			[Werkzeug.ABMANTELN, "Abmantelungswerkzeug"], [Werkzeug.ABISOLIEREN, "Abisolierzange"],
+			[Werkzeug.ANKLEMMEN, "Schraubendreher (Anklemmen)"]]:
 		var b := Button.new()
 		b.text = w[1]
 		b.toggle_mode = true
@@ -239,7 +240,8 @@ func _alles_neu_zeichnen() -> void:
 	geraete_knoten.clear()
 	leitung_knoten.clear()
 	for id in circuit.geraete:
-		_geraet_zeichnen(id)
+		if BAUTEILE.has(circuit.geraete[id].typ):
+			_geraet_zeichnen(id)
 	for l in circuit.leitungen:
 		_leitung_zeichnen(l)
 	_bohrungen_zeichnen()
@@ -264,8 +266,9 @@ func _werkzeug_waehlen(w: int) -> void:
 		Werkzeug.LEITUNG: _status("%s: Start-Bauteil anklicken, Eckpunkte setzen, Ziel-Bauteil anklicken. Esc bricht ab." % leitung_typ)
 		Werkzeug.SCHELLE: _status("Iso-Schelle: Auf die Leitung über einer Bohrung klicken (max. 25 cm Abstand).")
 		Werkzeug.SEITENSCHNEIDER: _status("Seitenschneider: Leitung anklicken, um sie zu entfernen.")
-		Werkzeug.ABMANTELN: _status("Abmantelungswerkzeug: Leitungsende am Bauteil anklicken.")
-		Werkzeug.ABISOLIEREN: _status("Abisolierzange (%d mm): abgemanteltes Leitungsende anklicken. Richtig sind 8 bis 12 mm." % abisolier_mm)
+		Werkzeug.ABMANTELN: _status("Abmantelungswerkzeug: Bauteil anklicken. Jeder Klick mantelt die nächste Leitung dort ab.")
+		Werkzeug.ANKLEMMEN: _status("Schraubendreher: Bauteil anklicken, um es in der Nahansicht anzuklemmen.")
+		Werkzeug.ABISOLIEREN: _status("Abisolierzange (%d mm): Bauteil anklicken. Jeder Klick isoliert die Adern der nächsten Leitung ab. Richtig sind 8 bis 12 mm." % abisolier_mm)
 
 # ---------------------------------------------------------------- Eingabe
 
@@ -316,6 +319,11 @@ func _unhandled_input(ev: InputEvent) -> void:
 			_status("Abgebrochen.")
 		elif k.keycode == KEY_DELETE and ausgewaehlt != "":
 			_geraet_entfernen(ausgewaehlt)
+		elif k.keycode == KEY_SPACE and ausgewaehlt != "" and circuit.zustand.get(ausgewaehlt, {}).has("stellung"):
+			var z: Dictionary = circuit.zustand[ausgewaehlt]
+			z.stellung = 1 - int(z.stellung)
+			_status("%s geschaltet: %s" % [ausgewaehlt, "EIN / Stellung 2" if z.stellung == 1 else "AUS / Stellung 1"])
+			_pruefen()
 
 func _klick(p: Vector3) -> void:
 	match werkzeug:
@@ -327,6 +335,7 @@ func _klick(p: Vector3) -> void:
 		Werkzeug.SEITENSCHNEIDER: _leitung_schneiden(p)
 		Werkzeug.ABMANTELN: _abmanteln(p)
 		Werkzeug.ABISOLIEREN: _abisolieren(p)
+		Werkzeug.ANKLEMMEN: _nahansicht_oeffnen(_geraet_bei(p))
 
 # ---------------------------------------------------------------- Werkzeuge
 
@@ -352,6 +361,8 @@ func _bauteil_setzen(p: Vector3) -> void:
 	# Ueberschneidung mit anderen Bauteilen pruefen
 	for id in circuit.geraete:
 		var o: Dictionary = circuit.geraete[id]
+		if not BAUTEILE.has(o.typ):
+			continue
 		var og: Vector3 = BAUTEILE[o.typ].groesse
 		var op: Vector3 = o.pos
 		if absf(op.x - p.x) < (og.x + g.x) / 2 and absf(op.y - p.y) < (og.y + g.y) / 2:
@@ -373,6 +384,8 @@ func _bauteil_setzen(p: Vector3) -> void:
 func _geraet_bei(p: Vector3) -> String:
 	for id in circuit.geraete:
 		var g: Dictionary = circuit.geraete[id]
+		if not BAUTEILE.has(g.typ):
+			continue
 		var gr: Vector3 = BAUTEILE[g.typ].groesse
 		var gp: Vector3 = g.pos
 		# Schmale Geraete etwas groesser anklickbar
@@ -391,7 +404,7 @@ func _auswaehlen(id: String) -> void:
 		for l in circuit.leitungen:
 			if l.get("start_geraet", "") == id or l.get("ende_geraet", "") == id:
 				anz += 1
-		_status("%s (%s), %d Leitung(en) angeschlossen. Entf entfernt es." % [id, BAUTEILE[g.typ].name, anz])
+		_status("%s (%s), %d Leitung(en) angeschlossen. Entf entfernt es, Leertaste schaltet Schalter." % [id, BAUTEILE[g.typ].name, anz])
 	else:
 		_status("Nichts ausgewählt.")
 
@@ -399,11 +412,16 @@ func _geraet_entfernen(id: String) -> void:
 	if id == "netz":
 		_status("Die Einspeisung kann nicht entfernt werden.")
 		return
-	circuit.geraete.erase(id)
-	circuit.zustand.erase(id)
+	var weg := [id]
+	for gid in circuit.geraete:
+		if circuit.geraete[gid].param.get("dose", "") == id:
+			weg.append(gid)   # Verbindungsklemmen in der Dose
+	for gid in weg:
+		circuit.geraete.erase(gid)
+		circuit.zustand.erase(gid)
 	var rest := []
 	for l in circuit.leitungen:
-		if l.get("start_geraet", "") != id and l.get("ende_geraet", "") != id:
+		if l.get("start_geraet", "") not in weg and l.get("ende_geraet", "") not in weg:
 			rest.append(l)
 	circuit.leitungen = rest
 	_alles_neu_zeichnen()
@@ -536,51 +554,86 @@ func _leitung_schneiden(p: Vector3) -> void:
 		leitung_knoten.erase(l.id)
 	_status("%s entfernt." % l.id)
 
-## Leitungsende in der Naehe: [leitung, "start"/"ende"] oder [null, ""]
-func _leitungsende_bei(p: Vector3) -> Array:
-	var best: Array = [null, ""]
-	var best_d := 0.06
+## Alle Leitungsenden an einem Bauteil: [[leitung, "start"/"ende"], ...]
+func _leitungsenden_am_geraet(id: String) -> Array:
+	var r := []
 	for l in circuit.leitungen:
-		var pts: Array = l.punkte
-		for ende in [["start", pts[0]], ["ende", pts[pts.size() - 1]]]:
-			var d := (ende[1] as Vector3).distance_to(p)
-			if d < best_d:
-				best_d = d
-				best = [l, ende[0]]
-	return best
+		if Circuit.LEITUNGEN[l.typ].get("einzelader", false):
+			continue
+		if l.get("start_geraet", "") == id:
+			r.append([l, "start"])
+		if l.get("ende_geraet", "") == id:
+			r.append([l, "ende"])
+	return r
 
+## Pro Klick wird das naechste noch nicht abgemantelte Leitungsende am Bauteil bearbeitet
 func _abmanteln(p: Vector3) -> void:
-	var e := _leitungsende_bei(p)
-	if e[0] == null:
-		_status("Kein Leitungsende in der Nähe (Bauteil anklicken, an dem die Leitung endet).")
+	var id := _geraet_bei(p)
+	if id == "":
+		_status("Bauteil anklicken, an dem die Leitung endet.")
 		return
-	var l: Dictionary = e[0]
-	if l.abgemantelt[e[1]]:
-		_status("%s ist an diesem Ende schon abgemantelt." % l.id)
-		return
-	l.abgemantelt[e[1]] = true
-	_leitung_zeichnen(l)
-	_status("%s abgemantelt (%s). Jetzt die Adern abisolieren." % [l.id, l.get(e[1] + "_geraet", "")])
+	for e in _leitungsenden_am_geraet(id):
+		var l: Dictionary = e[0]
+		if not l.abgemantelt[e[1]]:
+			l.abgemantelt[e[1]] = true
+			_leitung_zeichnen(l)
+			_status("%s an %s abgemantelt. Jetzt die Adern abisolieren." % [l.id, id])
+			return
+	_status("An %s gibt es keine Leitung mehr zum Abmanteln." % id)
 
+## Pro Klick wird das naechste abgemantelte, aber noch nicht abisolierte Leitungsende bearbeitet
 func _abisolieren(p: Vector3) -> void:
-	var e := _leitungsende_bei(p)
-	if e[0] == null:
-		_status("Kein Leitungsende in der Nähe.")
+	var id := _geraet_bei(p)
+	if id == "":
+		_status("Bauteil anklicken, an dem die Leitung endet.")
 		return
-	var l: Dictionary = e[0]
-	if not l.abgemantelt[e[1]]:
+	var nur_mantel := false
+	for e in _leitungsenden_am_geraet(id):
+		var l: Dictionary = e[0]
+		var feld := "abisoliert_von" if e[1] == "start" else "abisoliert_nach"
+		if l.adern.is_empty() or l.adern[0].get(feld, 0.0) > 0.0:
+			continue
+		if not l.abgemantelt[e[1]]:
+			nur_mantel = true
+			continue
+		for a in l.adern:
+			a[feld] = abisolier_mm
+		_leitung_zeichnen(l)
+		var hinweis := ""
+		if abisolier_mm < Circuit.ABISOLIERLAENGE.x:
+			hinweis = " Achtung: zu kurz, die Klemme fasst evtl. nur die Isolierung."
+		elif abisolier_mm > Circuit.ABISOLIERLAENGE.y:
+			hinweis = " Achtung: zu lang, blankes Kupfer schaut aus der Klemme."
+		_status("%s an %s: Adern %d mm abisoliert.%s" % [l.id, id, abisolier_mm, hinweis])
+		return
+	if nur_mantel:
 		_status("Erst abmanteln! Mit der Abisolierzange kommt man nicht durch den Mantel.")
+	else:
+		_status("An %s ist schon alles abisoliert." % id)
+
+# ---------------------------------------------------------------- Nahansicht
+
+var nahansicht: Nahansicht
+
+func _nahansicht_oeffnen(id: String) -> void:
+	if id == "":
+		_status("Kein Bauteil angeklickt.")
 		return
-	var feld := "abisoliert_von" if e[1] == "start" else "abisoliert_nach"
-	for a in l.adern:
-		a[feld] = abisolier_mm
-	_leitung_zeichnen(l)
-	var hinweis := ""
-	if abisolier_mm < Circuit.ABISOLIERLAENGE.x:
-		hinweis = " Achtung: zu kurz, die Klemme fasst evtl. nur die Isolierung."
-	elif abisolier_mm > Circuit.ABISOLIERLAENGE.y:
-		hinweis = " Achtung: zu lang, blankes Kupfer schaut aus der Klemme."
-	_status("%s: Adern %d mm abisoliert.%s" % [l.id, abisolier_mm, hinweis])
+	cam_target = circuit.geraete[id].pos + Vector3(0.12, 0, 0)
+	cam_dist = 0.35
+	cam_yaw = 0.0
+	cam_pitch = 0.0
+	_kamera_aktualisieren()
+	if nahansicht == null:
+		nahansicht = Nahansicht.new()
+		nahansicht.montage = self
+		status.get_parent().add_child(nahansicht)
+	nahansicht.oeffnen(id)
+
+## Wird von der Nahansicht nach jeder Aenderung aufgerufen
+func nahansicht_geaendert() -> void:
+	for l in circuit.leitungen:
+		_leitung_zeichnen(l)
 
 # ---------------------------------------------------------------- Pruefen / Datei
 
@@ -596,6 +649,14 @@ func _pruefen() -> void:
 	if not r.lampen_an.is_empty():
 		t += "[color=lime]Leuchtet: %s[/color]\n" % ", ".join(r.lampen_an)
 	ergebnis.text = t
+	# Sichtbar machen: Lampe leuchtet, ausgeloeste Schutzgeraete rot
+	for gid in geraete_knoten:
+		var mi := (geraete_knoten[gid] as Node3D).get_child(0) as MeshInstance3D
+		var m := mi.material_override as StandardMaterial3D
+		var typ: String = circuit.geraete[gid].typ
+		m.emission_enabled = gid in r.lampen_an or gid in r.ausgeloest
+		m.emission = Color(1.0, 0.9, 0.5) if gid in r.lampen_an else Color(0.9, 0.1, 0.1)
+		m.emission_energy_multiplier = 2.0 if typ == "lampe" else 0.6
 
 var _dialog_speichern := true
 func _speichern_dialog() -> void:
@@ -686,6 +747,17 @@ func _leitung_zeichnen(l: Dictionary) -> void:
 	if info.qs >= 2.5:
 		r += 0.0008
 	var tube := MeshInstance3D.new()
+	if info.get("einzelader", false):
+		# Bruecke im Verteiler: duenne Einzelader in ihrer Farbe, etwas ueber den Geraeten
+		var hoch: Array = []
+		for pt in l.punkte:
+			hoch.append((pt as Vector3) + Vector3(0, 0, 0.075))
+		tube.mesh = _rohr(hoch, 0.0015)
+		tube.material_override = _mat(ADERFARBE.get(l.adern[0].farbe, Color.BLACK), 0.5)
+		knoten.add_child(tube)
+		add_child(knoten)
+		leitung_knoten[l.id] = knoten
+		return
 	tube.mesh = _rohr(l.punkte, r)
 	tube.material_override = mat_steuer if String(l.typ).begins_with("Steuer") else mat_nym
 	knoten.add_child(tube)

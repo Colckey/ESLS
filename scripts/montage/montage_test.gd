@@ -60,9 +60,79 @@ func _ready() -> void:
 	# Seitenschneider
 	m._leitung_schneiden(Vector3(0.2, 0.2, 0))
 	_check("Seitenschneider entfernt Leitung", m.circuit.leitungen.is_empty())
+	m.queue_free()
+	_ausschaltung_komplett()
 	ausgabe += "\n%s" % ("ALLE TESTS OK" if fehlgeschlagen == 0 else "%d TEST(S) FEHLGESCHLAGEN" % fehlgeschlagen)
 	print(ausgabe)
 
 func _check(name: String, ok: bool) -> void:
 	if not ok: fehlgeschlagen += 1
 	ausgabe += "%s  %s\n" % ["OK  " if ok else "FAIL", name]
+
+## Komplette Ausschaltung ueber die echten Werkzeug-Funktionen und die Nahansicht verdrahten
+func _ausschaltung_komplett() -> void:
+	var m: Node3D = load("res://montage.tscn").instantiate()
+	add_child(m)
+	var plaetze := {"fi": Vector3(-0.45, 0.1, 0), "ls": Vector3(-0.39, 0.1, 0), "abzweigdose": Vector3(0.0, 0.2, 0),
+		"ausschalter": Vector3(0.0, -0.2, 0), "lampe": Vector3(0.4, 0.2, 0)}
+	for typ in plaetze:
+		var p: Vector3 = plaetze[typ]
+		m._bohren(p + Vector3(-0.005, -0.01, 0)); m._bohren(p + Vector3(0.005, 0.01, 0))
+		m.bauteil_typ = typ
+		m._bauteil_setzen(p)
+	_check("E2E: alle 5 Bauteile gesetzt", m.circuit.geraete.size() == 6)
+	m._werkzeug_waehlen(3)
+	for paar in [["ls", "abzweigdose"], ["abzweigdose", "ausschalter"], ["abzweigdose", "lampe"]]:
+		m._leitung_klick(plaetze[paar[0]])
+		m._leitung_klick(plaetze[paar[1]])
+	_check("E2E: 3 Leitungen verlegt", m.circuit.leitungen.size() == 3)
+	m.abisolier_mm = 10.0
+	for typ in plaetze:
+		for i in 3:
+			m._abmanteln(plaetze[typ])
+			m._abisolieren(plaetze[typ])
+	var alle_ok := true
+	for l in m.circuit.leitungen:
+		if not (l.abgemantelt.start and l.abgemantelt.ende and l.adern[0].abisoliert_von == 10.0 and l.adern[0].abisoliert_nach == 10.0):
+			alle_ok = false
+	_check("E2E: alle Enden abgemantelt und abisoliert", alle_ok)
+	# Verteiler: Bruecken
+	m._nahansicht_oeffnen("fi1")
+	var n: Nahansicht = m.nahansicht
+	for b in [["bn", "netz:L", "fi1:L_in"], ["bu", "netz:N", "fi1:N_in"], ["bn", "fi1:L_out", "ls1:in"]]:
+		n.bruecken_farbe = b[0]
+		n._bruecke_legen(b[1], b[2])
+	var w1: Dictionary = m.circuit.leitungen[0]   # ls1 -> dose1
+	var w2: Dictionary = m.circuit.leitungen[1]   # dose1 -> s1
+	var w3: Dictionary = m.circuit.leitungen[2]   # dose1 -> lampe1
+	n._anklemmen(w1, 0, "von", "ls1:out")      # bn
+	n._anklemmen(w1, 1, "von", "fi1:N_out")    # bu
+	n._anklemmen(w1, 2, "von", "netz:PE")      # gnye
+	# Abzweigdose: 4 Verbindungsklemmen (L, N, PE, Schaltdraht)
+	m._nahansicht_oeffnen("dose1")
+	for i in 4:
+		n._klemme_einsetzen()
+	n._anklemmen(w1, 0, "nach", "dose1_k1:a")
+	n._anklemmen(w1, 1, "nach", "dose1_k2:a")
+	n._anklemmen(w1, 2, "nach", "dose1_k3:a")
+	n._anklemmen(w2, 0, "von", "dose1_k1:b")   # L zum Schalter
+	n._anklemmen(w2, 1, "von", "dose1_k4:a")   # Schaltdraht zurueck
+	n._anklemmen(w3, 0, "von", "dose1_k4:b")
+	n._anklemmen(w3, 1, "von", "dose1_k2:b")
+	n._anklemmen(w3, 2, "von", "dose1_k3:b")
+	m._nahansicht_oeffnen("s1")
+	n._anklemmen(w2, 0, "nach", "s1:L")
+	n._anklemmen(w2, 1, "nach", "s1:1")
+	m._nahansicht_oeffnen("lampe1")
+	n._anklemmen(w3, 0, "nach", "lampe1:L")
+	n._anklemmen(w3, 1, "nach", "lampe1:N")
+	n._anklemmen(w3, 2, "nach", "lampe1:PE")
+	m.circuit.zustand["s1"].stellung = 1
+	var r: Dictionary = m.circuit.pruefen()
+	_check("E2E: Lampe leuchtet, nichts ausgelöst  %s" % [r.fehler], "lampe1" in r.lampen_an and r.ausgeloest.is_empty())
+	# Fehler einbauen: blauer Neutralleiter der Zuleitung in der Dose auf die L-Klemme -> Kurzschluss
+	n._anklemmen(w1, 1, "nach", "dose1_k1:c")
+	r = m.circuit.pruefen()
+	_check("E2E: N der Zuleitung auf L-Klemme -> LS löst aus", "ls1" in r.ausgeloest)
+	m._pruefen()   # Anzeige darf nicht abstuerzen
+	m.queue_free()

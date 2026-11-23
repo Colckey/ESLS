@@ -28,6 +28,8 @@ const LEITUNGEN := {
 	"NYM-J 5x2,5": {"adern": ["bn", "bk", "gy", "bu", "gnye"], "qs": 2.5},
 	"NYM-O 2x1,5": {"adern": ["bn", "bu"], "qs": 1.5},
 	"Steuerleitung 7x1,5": {"adern": ["1", "2", "3", "4", "5", "6", "gnye"], "qs": 1.5},
+	# Einzelader fuer die Verdrahtung im Verteiler (Bruecken), braucht keine Schellen
+	"H07V-K 1,5": {"adern": ["bn", "bk", "gy", "bu", "gnye"], "qs": 1.5, "einzelader": true},
 }
 
 ## Maximaler LS-Nennstrom je Querschnitt (vereinfachte Verlegeart C, NYM auf Wand)
@@ -82,7 +84,9 @@ func _montage_pruefen(r: Dictionary) -> void:
 		var info: Dictionary = LEITUNGEN[l.typ]
 		# Schellenabstand entlang der Leitung
 		var pts: Array = l.get("schellen", [])
-		if pts.size() < 2:
+		if info.get("einzelader", false):
+			pts = []   # keine Schellenpruefung
+		elif pts.size() < 2:
 			r.fehler.append("%s: Leitung ist nicht mit Iso-Schellen befestigt." % l.id)
 		for i in range(pts.size() - 1):
 			if (pts[i] as Vector3).distance_to(pts[i + 1]) > MAX_SCHELLENABSTAND + 0.001:

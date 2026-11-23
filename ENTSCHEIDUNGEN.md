@@ -15,3 +15,9 @@ Bitte kurz durchsehen. Alles lässt sich leicht ändern.
 | 9 | Einen FI pro Brett (für die Fehlerstromprüfung) | Reicht für Lehrjahr 1/2 | Mehrere FIs (später) |
 | 10 | Speicherdatei `.esim` (ZIP mit JSON + Prüfsumme) | Läuft auf jedem PC, Lehrer sieht Manipulation | – |
 | 11 | Godot 4.7 statt 4.3 | Ist bei dir installiert | – |
+| 12 | Abmanteln/Abisolieren: Bauteil anklicken, jeder Klick bearbeitet die nächste Leitung dort | Mehrere Leitungen enden am selben Punkt, so gibt es keine Verwechslung | Leitungsende einzeln anklicken (später, wenn Leitungen am Gehäuserand einführen) |
+| 13 | Abisolieren gilt für alle Adern einer Leitung gleichzeitig | Schneller; Fehler „zu lang/zu kurz“ wird trotzdem bewertet | Jede Ader einzeln (später in der Nahansicht) |
+| 14 | Nahansicht als Fenster rechts, Kamera zoomt auf das Bauteil | Läuft sicher auf schwachen PCs, gut lesbar | Klemmen direkt im 3D-Modell anklicken (späterer Ausbau) |
+| 15 | Verteiler = Einspeisung + FI + alle LS gemeinsam; Verdrahtung darin mit H07V-K-Brücken | Wie ein Kleinverteiler in der Schule | Eigene Hutschiene als Bauteil |
+| 16 | Schraubklemme max. 2 Adern, Verbindungsklemme (Wago) 1 Ader pro Steckplatz | Herstellerangaben üblich | – |
+| 17 | Schalter bedienen: Bauteil mit „Auswahl“ anklicken, Leertaste schaltet und prüft sofort | Einfach für den Anfang | Eigenes Werkzeug „Bedienen“ |
