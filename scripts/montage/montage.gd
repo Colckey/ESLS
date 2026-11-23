@@ -175,6 +175,7 @@ func _ui() -> void:
 		var b := Button.new()
 		b.text = w[1]
 		b.toggle_mode = true
+		b.focus_mode = Control.FOCUS_NONE   # sonst loest die Leertaste den Knopf aus
 		b.pressed.connect(_werkzeug_waehlen.bind(w[0]))
 		leiste.add_child(b)
 		werkzeug_knoepfe[w[0]] = b
@@ -219,6 +220,7 @@ func _ui() -> void:
 			["Lehrermodus", _lehrermodus]]:
 		var b := Button.new()
 		b.text = a[0]
+		b.focus_mode = Control.FOCUS_NONE
 		b.pressed.connect(a[1])
 		leiste2.add_child(b)
 
@@ -320,6 +322,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 			_vorschau_zeichnen(p)
 	elif ev is InputEventMouseButton and ev.pressed:
 		var mb := ev as InputEventMouseButton
+		get_viewport().gui_release_focus()   # Namensfeld/Auswahllisten loslassen
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
 			cam_dist *= 0.9
 			_kamera_aktualisieren()
@@ -396,10 +399,10 @@ func _bauteil_setzen(p: Vector3) -> void:
 	var i := 1
 	while circuit.geraete.has(KUERZEL[bauteil_typ] + str(i)):
 		i += 1
-	var id: String = KUERZEL[bauteil_typ] + str(i)
-	circuit.geraet_hinzufuegen(id, bauteil_typ, p, {"nennstrom": 16} if bauteil_typ == "ls" else {})
-	_geraet_zeichnen(id)
-	_status("%s gesetzt." % id)
+	var neu_id: String = KUERZEL[bauteil_typ] + str(i)
+	circuit.geraet_hinzufuegen(neu_id, bauteil_typ, p, {"nennstrom": 16} if bauteil_typ == "ls" else {})
+	_geraet_zeichnen(neu_id)
+	_status("%s gesetzt." % neu_id)
 
 func _geraet_bei(p: Vector3) -> String:
 	for id in circuit.geraete:
