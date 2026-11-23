@@ -5,7 +5,7 @@ extends PanelContainer
 ## Im Verteiler (Einspeisung, FI, LS) sieht man alle Verteilergeraete und kann
 ## Bruecken mit H07V-K-Einzeladern legen. In der Abzweigdose setzt man Verbindungsklemmen.
 
-const VERTEILER := ["einspeisung", "fi", "ls"]
+const VERTEILER := ["einspeisung", "fi", "ls", "schuetz", "zeitrelais"]   # alles auf der Hutschiene
 const FARBNAME := {"bn": "braun", "bu": "blau", "gnye": "grün-gelb", "bk": "schwarz", "gy": "grau"}
 const MAX_ADERN_SCHRAUBKLEMME := 2
 

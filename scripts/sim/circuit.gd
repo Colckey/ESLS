@@ -12,6 +12,11 @@ const TYPEN := {
 	"ls":          ["in", "out"],
 	"ausschalter": ["L", "1"],
 	"wechselschalter": ["L", "1", "2"],
+	"kreuzschalter": ["1", "2", "3", "4"],
+	"taster":      ["L", "1"],      # Schliesser, Stellung 1 = gedrueckt
+	"taster_aus":  ["L", "1"],      # Oeffner, Stellung 1 = gedrueckt (dann offen)
+	"schuetz":     ["A1", "A2", "1", "2", "3", "4", "5", "6", "13", "14", "21", "22"],
+	"zeitrelais":  ["A1", "A2", "15", "16", "18"],
 	"lampe":       ["L", "N", "PE"],
 	"steckdose":   ["L", "N", "PE"],
 	"klemme":      ["a", "b", "c", "d", "e"],   # Verbindungsklemme: alle Klemmen leitend verbunden
@@ -59,10 +64,12 @@ func _union(a: String, b: String) -> void:
 func geraet_hinzufuegen(id: String, typ: String, pos := Vector3.ZERO, param := {}) -> void:
 	assert(TYPEN.has(typ), "Unbekannter Typ " + typ)
 	geraete[id] = {"typ": typ, "pos": pos, "param": param}
-	if typ in ["ausschalter", "wechselschalter"]:
+	if typ in ["ausschalter", "wechselschalter", "kreuzschalter", "taster", "taster_aus"]:
 		zustand[id] = {"stellung": 0}
 	if typ in ["ls", "fi"]:
 		zustand[id] = {"ausgeloest": false}
+	if typ in ["schuetz", "zeitrelais"]:
+		zustand[id] = {"an": false}   # Spulenzustand bleibt erhalten (Selbsthaltung)
 
 func leitung_hinzufuegen(l: Dictionary) -> void:
 	leitungen.append(l)
@@ -73,7 +80,7 @@ func _typ(klemme: String) -> String:
 # --- Pruefung ---------------------------------------------------------------
 ## Liefert {ok, ausgeloest:[ids], fehler:[texte], warnungen:[texte], lampen_an:[ids]}
 func pruefen() -> Dictionary:
-	var r := {"ok": true, "ausgeloest": [], "fehler": [], "warnungen": [], "lampen_an": []}
+	var r := {"ok": true, "ausgeloest": [], "fehler": [], "warnungen": [], "lampen_an": [], "spulen_an": []}
 	_montage_pruefen(r)
 	_netz_pruefen(r)
 	r.ok = r.fehler.is_empty() and r.ausgeloest.is_empty()
@@ -140,26 +147,44 @@ func _montage_pruefen(r: Dictionary) -> void:
 						gemeldet[k.get_slice(":", 0)] = true
 						r.fehler.append("%s: %s mm² ist mit LS %dA nicht ausreichend abgesichert." % [l.id, str(info.qs), nenn])
 
-func _netz_pruefen(r: Dictionary) -> void:
+## Kontakte von Schuetz/Zeitrelais je nach Spulenzustand
+const SCHUETZ_SCHLIESSER := [["1", "2"], ["3", "4"], ["5", "6"], ["13", "14"]]
+const SCHUETZ_OEFFNER := [["21", "22"]]
+
+## Knoten aufbauen. spulen: id -> bool (Spule unter Spannung)
+func _verbinden(spulen: Dictionary) -> void:
 	_p.clear()
-	var quelle := ""
 	for id in geraete:
 		var g: Dictionary = geraete[id]
 		var z: Dictionary = zustand.get(id, {})
 		match g.typ:
-			"einspeisung": quelle = id
 			"ls":
 				if not z.ausgeloest: _union(id + ":in", id + ":out")
-			"ausschalter":
-				if z.stellung == 1: _union(id + ":L", id + ":1")
+			"ausschalter", "taster":
+				if int(z.stellung) == 1: _union(id + ":L", id + ":1")
+			"taster_aus":
+				if int(z.stellung) == 0: _union(id + ":L", id + ":1")
 			"wechselschalter":
-				_union(id + ":L", id + (":1" if z.stellung == 0 else ":2"))
+				_union(id + ":L", id + (":1" if int(z.stellung) == 0 else ":2"))
+			"kreuzschalter":
+				if int(z.stellung) == 0:
+					_union(id + ":1", id + ":3"); _union(id + ":2", id + ":4")
+				else:
+					_union(id + ":1", id + ":4"); _union(id + ":2", id + ":3")
+			"schuetz":
+				var an: bool = spulen.get(id, false)
+				for k in (SCHUETZ_SCHLIESSER if an else SCHUETZ_OEFFNER):
+					_union(id + ":" + k[0], id + ":" + k[1])
+			"zeitrelais":
+				# Ansprechverzoegert: nach Ablauf der Zeit schaltet 15 von 16 auf 18
+				var an: bool = spulen.get(id, false)
+				_union(id + ":15", id + (":18" if an else ":16"))
 			"klemme", "pe_schiene", "n_schiene":
 				var ks: Array = TYPEN[g.typ]
 				for k in ks: _union(id + ":" + k, id + ":" + ks[0])
 	# FI wird NICHT vereint: Ein- und Ausgang bleiben getrennte Knoten,
 	# damit man sieht, ob Hin- und Rueckstrom beide durch den FI fliessen.
-	# Nur abgemantelte und abisolierte Aderenden haben Kontakt in der Klemme
+	# Nur abgemantelte und abisolierte Aderenden haben Kontakt in der Klemme.
 	for l in leitungen:
 		var am: Dictionary = l.get("abgemantelt", {})
 		for a in l.adern:
@@ -167,25 +192,76 @@ func _netz_pruefen(r: Dictionary) -> void:
 					and am.get("start", false) and am.get("ende", false) \
 					and a.get("abisoliert_von", 0.0) > 0.0 and a.get("abisoliert_nach", 0.0) > 0.0:
 				_union(a.von, a.nach)
+
+## Spannungsfuehrende Knoten: {L:[...], N:[...], PE, fi, fi_L, fi_N, warnung}
+func _quellen(quelle: String) -> Dictionary:
+	var q := {"L": [_find(quelle + ":L")], "N": [_find(quelle + ":N")], "PE": _find(quelle + ":PE"),
+		"fi": "", "fi_L": "", "fi_N": "", "warnung": ""}
+	for id in geraete:
+		if geraete[id].typ == "fi" and not zustand[id].ausgeloest:
+			q.fi = id
+	if q.fi != "":
+		var fi: String = q.fi
+		# Eingang am Netz? Dann ist der Ausgang ebenfalls Spannung fuehrend
+		if _find(fi + ":L_in") == q.L[0] and _find(fi + ":N_in") == q.N[0]:
+			q.fi_L = _find(fi + ":L_out")
+			q.fi_N = _find(fi + ":N_out")
+			q.L.append(q.fi_L)
+			q.N.append(q.fi_N)
+		elif _find(fi + ":L_in") == q.N[0] or _find(fi + ":N_in") == q.L[0]:
+			q.warnung = "FI: L und N am Eingang vertauscht."
+	return q
+
+## Verbraucher (Lampe, Steckdose, Spulen) und ihre beiden Anschluesse
+func _verbraucher() -> Array:
+	var r := []
+	for id in geraete:
+		match geraete[id].typ:
+			"lampe", "steckdose": r.append([id, id + ":L", id + ":N"])
+			"schuetz", "zeitrelais": r.append([id, id + ":A1", id + ":A2"])
+	return r
+
+func _unter_spannung(q: Dictionary, a: String, b: String) -> bool:
+	var ka := _find(a)
+	var kb := _find(b)
+	return (ka in q.L and kb in q.N) or (ka in q.N and kb in q.L)
+
+func _netz_pruefen(r: Dictionary) -> void:
+	var quelle := ""
+	for id in geraete:
+		if geraete[id].typ == "einspeisung":
+			quelle = id
 	if quelle == "":
 		r.fehler.append("Keine Einspeisung vorhanden.")
 		return
-	var fi := ""
+	# Spulen schalten Kontakte, die wieder Spulen schalten: bis zum stabilen Zustand rechnen
+	var spulen := {}
 	for id in geraete:
-		if geraete[id].typ == "fi" and not zustand[id].ausgeloest:
-			fi = id
-	var L := [_find(quelle + ":L")]
-	var N := [_find(quelle + ":N")]
-	var PE := _find(quelle + ":PE")
-	var fi_L := ""; var fi_N := ""
-	if fi != "":
-		# Eingang am Netz? Dann ist der Ausgang ebenfalls Spannung fuehrend
-		if _find(fi + ":L_in") == L[0] and _find(fi + ":N_in") == N[0]:
-			fi_L = _find(fi + ":L_out"); fi_N = _find(fi + ":N_out")
-			L.append(fi_L); N.append(fi_N)
-		elif _find(fi + ":L_in") == N[0] or _find(fi + ":N_in") == L[0]:
-			r.warnungen.append("FI: L und N am Eingang vertauscht.")
-	# Kurzschluss L-N
+		if geraete[id].typ in ["schuetz", "zeitrelais"] and zustand.get(id, {}).get("an", false):
+			spulen[id] = true
+	var q := {}
+	for durchlauf in 12:
+		_verbinden(spulen)
+		q = _quellen(quelle)
+		var neu := {}
+		for v in _verbraucher():
+			if geraete[v[0]].typ in ["schuetz", "zeitrelais"] and _unter_spannung(q, v[1], v[2]):
+				neu[v[0]] = true
+		if neu == spulen:
+			break
+		spulen = neu
+		if durchlauf == 11:
+			r.warnungen.append("Steuerung schwingt (Schütz schaltet sich selbst ein und aus).")
+	for id in geraete:
+		if geraete[id].typ in ["schuetz", "zeitrelais"]:
+			zustand[id] = {"an": spulen.has(id)}
+	if q.warnung != "":
+		r.warnungen.append(q.warnung)
+	var L: Array = q.L
+	var N: Array = q.N
+	var PE: String = q.PE
+	var fi: String = q.fi
+	# Kurzschluss L-N, Erdschluss L-PE
 	for l_ in L:
 		if l_ in N:
 			_ausloesen(r, l_, "Kurzschluss zwischen L und N")
@@ -194,26 +270,28 @@ func _netz_pruefen(r: Dictionary) -> void:
 			_ausloesen(r, l_, "Erdschluss: L hat Verbindung zum Schutzleiter")
 			if fi != "": r.ausgeloest.append(fi)
 			return
-	if fi_N != "" and fi_N == PE:
+	if q.fi_N != "" and q.fi_N == PE:
 		r.ausgeloest.append(fi)
 		r.fehler.append("FI löst aus: N nach dem FI ist mit PE verbunden.")
 		return
 	# Verbraucher
-	for id in geraete:
-		var g: Dictionary = geraete[id]
-		if g.typ not in ["lampe", "steckdose"]:
-			continue
-		if _find(id + ":PE") != PE:
+	for v in _verbraucher():
+		var id: String = v[0]
+		var typ: String = geraete[id].typ
+		if typ in ["lampe", "steckdose"] and _find(id + ":PE") != PE:
 			r.fehler.append("%s: Schutzleiter nicht angeschlossen." % id)
-		var kl := _find(id + ":L"); var kn := _find(id + ":N")
-		if kl in L and kn in N:
-			if fi != "" and ((kl == fi_L) != (kn == fi_N)):
+		var ka := _find(v[1])
+		var kb := _find(v[2])
+		if _unter_spannung(q, v[1], v[2]):
+			# FI: Hin- und Rueckleiter muessen beide durch den FI (oder beide nicht)
+			if fi != "" and ((ka == q.fi_L or kb == q.fi_L) != (ka == q.fi_N or kb == q.fi_N)):
 				r.ausgeloest.append(fi)
 				r.fehler.append("FI löst aus: Hin- und Rückleiter von %s laufen nicht beide über den FI." % id)
 				return
-			if g.typ == "lampe": r.lampen_an.append(id)
-		elif kl in N and kn in L:
-			r.fehler.append("%s: L und N vertauscht." % id)
+			if typ in ["lampe", "steckdose"] and ka in N and kb in L:
+				r.fehler.append("%s: L und N vertauscht." % id)
+			if typ == "lampe": r.lampen_an.append(id)
+			elif typ != "steckdose": r.spulen_an.append(id)
 
 func _ausloesen(r: Dictionary, knoten: String, grund: String) -> void:
 	var ls_ids := []

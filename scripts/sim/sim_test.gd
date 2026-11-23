@@ -33,6 +33,8 @@ func _ready() -> void:
 	c = aufbau(); c.geraete["ls1"].param.nennstrom = 20; r = _pruefe(c, 1)
 	_check("LS 20A an 1,5 mm2 -> Fehler (genau einmal gemeldet)", r, not r.ok and r.fehler.size() == 1)
 
+	_schuetz_selbsthaltung()
+	_kreuzschaltung()
 	_speichern_laden()
 	ausgabe += "\n%s" % ("ALLE TESTS OK" if fehlgeschlagen == 0 else "%d TEST(S) FEHLGESCHLAGEN" % fehlgeschlagen)
 	print(ausgabe)
@@ -80,3 +82,54 @@ func _speichern_laden() -> void:
 	var ok: bool = err == OK and d.has("circuit") and d.unveraendert and "lampe1" in d.circuit.pruefen().lampen_an
 	if not ok: fehlgeschlagen += 1
 	ausgabe += "%s  Speichern und Laden (.esim) ergibt dieselbe Schaltung\n" % ("OK  " if ok else "FAIL")
+
+## Schuetzschaltung mit Selbsthaltung: S0 (Aus-Taster), S1 (Ein-Taster), K1, Lampe ueber Hauptkontakt 1-2
+func _schuetz_selbsthaltung() -> void:
+	var c := Circuit.new()
+	for g in [["netz", "einspeisung"], ["fi1", "fi"], ["ls1", "ls"], ["s0", "taster_aus"], ["s1", "taster"],
+			["k1", "schuetz"], ["lampe1", "lampe"]]:
+		c.geraet_hinzufuegen(g[0], g[1], Vector3.ZERO, {"nennstrom": 16} if g[1] == "ls" else {})
+	var s := [Vector3(0, 0, 0), Vector3(0.2, 0, 0)]
+	c.leitung_hinzufuegen(_l("v", "H07V-K 1,5", [["bn", "netz:L", "fi1:L_in"]], s))
+	c.leitung_hinzufuegen(_l("v2", "H07V-K 1,5", [["bu", "netz:N", "fi1:N_in"]], s))
+	c.leitung_hinzufuegen(_l("v3", "H07V-K 1,5", [["bn", "fi1:L_out", "ls1:in"]], s))
+	c.leitung_hinzufuegen(_l("st", "Steuerleitung 7x1,5", [
+		["1", "ls1:out", "s0:L"], ["2", "s0:1", "s1:L"], ["3", "s0:1", "k1:13"],
+		["4", "s1:1", "k1:A1"], ["5", "k1:14", "k1:A1"], ["6", "k1:A2", "fi1:N_out"]], s))
+	c.leitung_hinzufuegen(_l("w", "NYM-J 5x1,5", [
+		["bk", "ls1:out", "k1:1"], ["bn", "k1:2", "lampe1:L"], ["bu", "fi1:N_out", "lampe1:N"], ["gnye", "netz:PE", "lampe1:PE"]], s))
+	var r := c.pruefen()
+	_check("Schütz: ohne Tastendruck aus", r, r.lampen_an.is_empty() and r.ausgeloest.is_empty())
+	c.zustand["s1"].stellung = 1
+	r = c.pruefen()
+	_check("Schütz: S1 gedrückt -> K1 zieht an, Lampe an", r, "k1" in r.spulen_an and "lampe1" in r.lampen_an)
+	c.zustand["s1"].stellung = 0
+	r = c.pruefen()
+	_check("Schütz: S1 losgelassen -> Selbsthaltung, Lampe bleibt an", r, "lampe1" in r.lampen_an)
+	c.zustand["s0"].stellung = 1
+	r = c.pruefen()
+	_check("Schütz: S0 gedrückt -> K1 fällt ab, Lampe aus", r, r.lampen_an.is_empty())
+	c.zustand["s0"].stellung = 0
+	r = c.pruefen()
+	_check("Schütz: S0 losgelassen -> bleibt aus", r, r.lampen_an.is_empty())
+
+## Kreuzschaltung: Wechsel - Kreuz - Wechsel, jede Betaetigung schaltet die Lampe um
+func _kreuzschaltung() -> void:
+	var c := Circuit.new()
+	for g in [["netz", "einspeisung"], ["ls1", "ls"], ["w1", "wechselschalter"], ["x1", "kreuzschalter"],
+			["w2", "wechselschalter"], ["lampe1", "lampe"]]:
+		c.geraet_hinzufuegen(g[0], g[1], Vector3.ZERO, {"nennstrom": 16} if g[1] == "ls" else {})
+	var s := [Vector3(0, 0, 0), Vector3(0.2, 0, 0)]
+	c.leitung_hinzufuegen(_l("a", "NYM-J 5x1,5", [["bn", "netz:L", "ls1:in"], ["bk", "ls1:out", "w1:L"],
+		["bu", "netz:N", "lampe1:N"], ["gnye", "netz:PE", "lampe1:PE"]], s))
+	c.leitung_hinzufuegen(_l("b", "NYM-J 5x1,5", [["bk", "w1:1", "x1:1"], ["gy", "w1:2", "x1:2"],
+		["bn", "x1:3", "w2:1"], ["bu", "x1:4", "w2:2"]], s))
+	c.leitung_hinzufuegen(_l("c", "NYM-J 3x1,5", [["bn", "w2:L", "lampe1:L"]], s))
+	var an := []
+	for st in [[0, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 1]]:
+		c.zustand["w1"].stellung = st[0]
+		c.zustand["x1"].stellung = st[1]
+		c.zustand["w2"].stellung = st[2]
+		an.append("lampe1" in c.pruefen().lampen_an)
+	var r := c.pruefen()
+	_check("Kreuzschaltung: jede Betätigung schaltet um %s" % [an], r, an[0] != an[1] and an[1] != an[2] and an[2] != an[3])

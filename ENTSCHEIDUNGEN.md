@@ -21,3 +21,7 @@ Bitte kurz durchsehen. Alles lässt sich leicht ändern.
 | 15 | Verteiler = Einspeisung + FI + alle LS gemeinsam; Verdrahtung darin mit H07V-K-Brücken | Wie ein Kleinverteiler in der Schule | Eigene Hutschiene als Bauteil |
 | 16 | Schraubklemme max. 2 Adern, Verbindungsklemme (Wago) 1 Ader pro Steckplatz | Herstellerangaben üblich | – |
 | 17 | Schalter bedienen: Bauteil mit „Auswahl“ anklicken, Leertaste schaltet und prüft sofort | Einfach für den Anfang | Eigenes Werkzeug „Bedienen“ |
+| 18 | Schütz und Zeitrelais sitzen im Verteiler (Hutschiene) und erscheinen in dessen Nahansicht | Praxisüblich | Eigene Steuerungsplatte |
+| 19 | Zeitrelais vorerst ansprechverzögert ohne echte Zeit: beim Prüfen gilt die Zeit als abgelaufen | Statische Prüfung reicht für Verdrahtungsfehler | Zeitlauf mit Uhr (später, für Treppenlicht) |
+| 20 | Taster werden per Leertaste gedrückt/losgelassen (zweimal drücken) | Einfach | Taste gedrückt halten |
+| 21 | Stromstoßschalter und Treppenlichtautomat noch nicht drin | Brauchen echte Zeit-/Flankenlogik | Nächster Ausbauschritt |

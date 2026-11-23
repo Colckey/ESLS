@@ -29,9 +29,16 @@ const BAUTEILE := {
 	"wechselschalter": {"name": "Wechselschalter", "groesse": Vector3(0.08, 0.08, 0.05), "farbe": Color(0.95, 0.95, 0.93)},
 	"steckdose":       {"name": "Steckdose", "groesse": Vector3(0.08, 0.08, 0.05), "farbe": Color(0.95, 0.95, 0.93)},
 	"lampe":           {"name": "Lampenfassung", "groesse": Vector3(0.09, 0.09, 0.06), "farbe": Color(0.35, 0.35, 0.35)},
+	"kreuzschalter":   {"name": "Kreuzschalter", "groesse": Vector3(0.08, 0.08, 0.05), "farbe": Color(0.95, 0.95, 0.93)},
+	"taster":          {"name": "Taster (Schließer)", "groesse": Vector3(0.08, 0.08, 0.05), "farbe": Color(0.6, 0.85, 0.6)},
+	"taster_aus":      {"name": "Taster (Öffner)", "groesse": Vector3(0.08, 0.08, 0.05), "farbe": Color(0.9, 0.5, 0.5)},
+	"schuetz":         {"name": "Schütz", "groesse": Vector3(0.045, 0.085, 0.08), "farbe": Color(0.85, 0.85, 0.82)},
+	"zeitrelais":      {"name": "Zeitrelais (ansprechverz.)", "groesse": Vector3(0.018, 0.09, 0.07), "farbe": Color(0.8, 0.85, 0.95)},
 }
-const SETZBAR := ["fi", "ls", "abzweigdose", "ausschalter", "wechselschalter", "steckdose", "lampe"]
-const KUERZEL := {"fi": "fi", "ls": "ls", "abzweigdose": "dose", "ausschalter": "s", "wechselschalter": "ws", "steckdose": "sd", "lampe": "lampe"}
+const SETZBAR := ["fi", "ls", "abzweigdose", "ausschalter", "wechselschalter", "kreuzschalter", "taster", "taster_aus",
+	"steckdose", "lampe", "schuetz", "zeitrelais"]
+const KUERZEL := {"fi": "fi", "ls": "ls", "abzweigdose": "dose", "ausschalter": "s", "wechselschalter": "ws",
+	"kreuzschalter": "x", "taster": "t", "taster_aus": "t0", "steckdose": "sd", "lampe": "lampe", "schuetz": "k", "zeitrelais": "kt"}
 
 var circuit := Circuit.new()
 var werkzeug: int = Werkzeug.AUSWAHL
@@ -369,7 +376,7 @@ func _bauteil_setzen(p: Vector3) -> void:
 			_status("Platz ist schon belegt (%s)." % id)
 			return
 	# Schmale Reiheneinbaugeraete (LS) brauchen 1 Bohrung, sonst 2 (Befestigungsschrauben)
-	var noetig := 1 if bauteil_typ == "ls" else 2
+	var noetig := 1 if bauteil_typ in ["ls", "zeitrelais"] else 2
 	if _bohrungen_im_rechteck(p, g) < noetig:
 		_status("Erst bohren: %s braucht %d Bohrung(en) unter dem Bauteil." % [BAUTEILE[bauteil_typ].name, noetig])
 		return
@@ -648,14 +655,16 @@ func _pruefen() -> void:
 		t += "[color=yellow]• %s[/color]\n" % w
 	if not r.lampen_an.is_empty():
 		t += "[color=lime]Leuchtet: %s[/color]\n" % ", ".join(r.lampen_an)
+	if not r.spulen_an.is_empty():
+		t += "[color=lime]Angezogen: %s[/color]\n" % ", ".join(r.spulen_an)
 	ergebnis.text = t
 	# Sichtbar machen: Lampe leuchtet, ausgeloeste Schutzgeraete rot
 	for gid in geraete_knoten:
 		var mi := (geraete_knoten[gid] as Node3D).get_child(0) as MeshInstance3D
 		var m := mi.material_override as StandardMaterial3D
 		var typ: String = circuit.geraete[gid].typ
-		m.emission_enabled = gid in r.lampen_an or gid in r.ausgeloest
-		m.emission = Color(1.0, 0.9, 0.5) if gid in r.lampen_an else Color(0.9, 0.1, 0.1)
+		m.emission_enabled = gid in r.lampen_an or gid in r.ausgeloest or gid in r.spulen_an
+		m.emission = Color(1.0, 0.9, 0.5) if gid in r.lampen_an else (Color(0.2, 0.8, 0.2) if gid in r.spulen_an else Color(0.9, 0.1, 0.1))
 		m.emission_energy_multiplier = 2.0 if typ == "lampe" else 0.6
 
 var _dialog_speichern := true

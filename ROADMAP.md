@@ -12,7 +12,7 @@ Status: ✅ fertig · 🔧 in Arbeit · ⬜ offen
 | 5 | Nahansicht Anklemmen | Kamera zoomt an Bauteil, Adern einzeln in Klemmen stecken, Schraubendreher | 🔧 erste Version (Fenster-Nahansicht) |
 | 6 | Installationsgeräte 3D | FI, LS, Ausschalter, Wechsel-/Kreuzschalter, Schuko-Steckdose, Abzweigdose mit Klemmen, Lampe | ⬜ |
 | 7 | Prüfen in 3D | Prüfknopf, Schalter bedienen, Lampe leuchtet, LS/FI kippen sichtbar, Fehlerliste | 🔧 Lampe leuchtet, ausgelöste Geräte rot, Leertaste schaltet |
-| 8 | Steuerungstechnik | Schütz, Zeitrelais (Treppenlicht), Stromstoßschalter, Steuerleitung | ⬜ |
+| 8 | Steuerungstechnik | Schütz, Zeitrelais (Treppenlicht), Stromstoßschalter, Steuerleitung | 🔧 Schütz mit Selbsthaltung, Taster, Kreuzschalter, Zeitrelais (ohne Zeitlauf); offen: Stromstoß, Treppenlicht |
 | 9 | Lehrermodus | Aufgaben anlegen, Schülerdatei öffnen, automatisch bewerten, Manipulationshinweis | ⬜ |
 | 10 | Windows-Export | Portable .exe ohne Installation, Test auf Schulrechner | ⬜ |
 
