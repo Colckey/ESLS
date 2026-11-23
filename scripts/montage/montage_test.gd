@@ -38,6 +38,19 @@ func _ready() -> void:
 	for f in r.fehler:
 		if "Schelle" in f: schellenfehler = true
 	_check("Schellenabstand in Ordnung", not schellenfehler)
+	# Abmanteln / Abisolieren
+	m._abisolieren(Vector3(0.0, 0.2, 0))
+	_check("Abisolieren vor Abmanteln abgelehnt", l.adern[0].abisoliert_von == 0.0)
+	m._abmanteln(Vector3(0.0, 0.2, 0))
+	_check("Start abgemantelt", l.abgemantelt.start and not l.abgemantelt.ende)
+	m.abisolier_mm = 10.0
+	m._abisolieren(Vector3(0.0, 0.2, 0))
+	_check("Adern am Start 10 mm abisoliert", l.adern[2].abisoliert_von == 10.0 and l.adern[2].abisoliert_nach == 0.0)
+	m._abmanteln(Vector3(0.4, 0.2, 0))
+	m.abisolier_mm = 20.0
+	m._abisolieren(Vector3(0.4, 0.2, 0))
+	var r2: Dictionary = m.circuit.pruefen()
+	_check("Zu lang abisoliert wird erst beim Anklemmen geprüft (noch keine Klemme)", r2.fehler.filter(func(f): return "zu lang" in f).is_empty())
 	# Speichern / Laden
 	var pfad := "user://montage_test.esim"
 	_check("Speichern", Projektdatei.speichern(m.circuit, pfad) == OK)

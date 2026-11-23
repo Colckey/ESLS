@@ -11,7 +11,13 @@ const BOARD_H := 0.8
 const RASTER := 0.01          # 1 cm Fangraster
 const BOHR_FANG := 0.015      # Schelle/Geraet sucht Bohrung im Umkreis von 1,5 cm
 
-enum Werkzeug { AUSWAHL, BOHRER, BAUTEIL, LEITUNG, SCHELLE, SEITENSCHNEIDER }
+enum Werkzeug { AUSWAHL, BOHRER, BAUTEIL, LEITUNG, SCHELLE, SEITENSCHNEIDER, ABMANTELN, ABISOLIEREN }
+
+## Aderfarben fuer die Darstellung
+const ADERFARBE := {
+	"bn": Color(0.45, 0.25, 0.1), "bu": Color(0.1, 0.35, 0.85), "gnye": Color(0.55, 0.8, 0.1),
+	"bk": Color(0.08, 0.08, 0.08), "gy": Color(0.55, 0.55, 0.55),
+}
 
 ## Groesse (Breite, Hoehe, Tiefe in m), Farbe und Anzeigename je Geraetetyp
 const BAUTEILE := {
@@ -32,6 +38,7 @@ var werkzeug: int = Werkzeug.AUSWAHL
 var bauteil_typ := "fi"
 var leitung_typ := "NYM-J 3x1,5"
 var ausgewaehlt := ""
+var abisolier_mm := 10.0
 
 # Leitung, die gerade verlegt wird
 var verlege_start := ""
@@ -142,13 +149,19 @@ func _kamera_aktualisieren() -> void:
 func _ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
+	var zeilen := VBoxContainer.new()
+	zeilen.position = Vector2(8, 8)
+	layer.add_child(zeilen)
 	var leiste := HBoxContainer.new()
-	leiste.position = Vector2(8, 8)
 	leiste.add_theme_constant_override("separation", 6)
-	layer.add_child(leiste)
+	zeilen.add_child(leiste)
+	var leiste2 := HBoxContainer.new()
+	leiste2.add_theme_constant_override("separation", 6)
+	zeilen.add_child(leiste2)
 
 	for w in [[Werkzeug.AUSWAHL, "Auswahl"], [Werkzeug.BOHRER, "Bohrmaschine"], [Werkzeug.BAUTEIL, "Bauteil setzen"],
-			[Werkzeug.LEITUNG, "Leitung verlegen"], [Werkzeug.SCHELLE, "Iso-Schelle"], [Werkzeug.SEITENSCHNEIDER, "Seitenschneider"]]:
+			[Werkzeug.LEITUNG, "Leitung verlegen"], [Werkzeug.SCHELLE, "Iso-Schelle"], [Werkzeug.SEITENSCHNEIDER, "Seitenschneider"],
+			[Werkzeug.ABMANTELN, "Abmantelungswerkzeug"], [Werkzeug.ABISOLIEREN, "Abisolierzange"]]:
 		var b := Button.new()
 		b.text = w[1]
 		b.toggle_mode = true
@@ -162,7 +175,7 @@ func _ui() -> void:
 	bt.item_selected.connect(func(i: int) -> void:
 		bauteil_typ = SETZBAR[i]
 		_werkzeug_waehlen(Werkzeug.BAUTEIL))
-	leiste.add_child(bt)
+	leiste2.add_child(bt)
 
 	var lt := OptionButton.new()
 	var namen: Array = Circuit.LEITUNGEN.keys()
@@ -171,21 +184,33 @@ func _ui() -> void:
 	lt.item_selected.connect(func(i: int) -> void:
 		leitung_typ = namen[i]
 		_werkzeug_waehlen(Werkzeug.LEITUNG))
-	leiste.add_child(lt)
+	leiste2.add_child(lt)
+
+	var lbl_mm := Label.new()
+	lbl_mm.text = "Abisolierlänge:"
+	leiste2.add_child(lbl_mm)
+	var mm := SpinBox.new()
+	mm.min_value = 2
+	mm.max_value = 30
+	mm.step = 1
+	mm.value = abisolier_mm
+	mm.suffix = "mm"
+	mm.value_changed.connect(func(v: float) -> void: abisolier_mm = v)
+	leiste2.add_child(mm)
 
 	for a in [["Prüfen", _pruefen], ["Speichern", _speichern_dialog], ["Laden", _laden_dialog], ["Neu", _neues_projekt]]:
 		var b := Button.new()
 		b.text = a[0]
 		b.pressed.connect(a[1])
-		leiste.add_child(b)
+		leiste2.add_child(b)
 
 	status = Label.new()
-	status.position = Vector2(8, 48)
+	status.position = Vector2(8, 80)
 	status.add_theme_color_override("font_color", Color.WHITE)
 	layer.add_child(status)
 
 	ergebnis = RichTextLabel.new()
-	ergebnis.position = Vector2(8, 80)
+	ergebnis.position = Vector2(8, 108)
 	ergebnis.size = Vector2(520, 300)
 	ergebnis.bbcode_enabled = true
 	ergebnis.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -239,6 +264,8 @@ func _werkzeug_waehlen(w: int) -> void:
 		Werkzeug.LEITUNG: _status("%s: Start-Bauteil anklicken, Eckpunkte setzen, Ziel-Bauteil anklicken. Esc bricht ab." % leitung_typ)
 		Werkzeug.SCHELLE: _status("Iso-Schelle: Auf die Leitung über einer Bohrung klicken (max. 25 cm Abstand).")
 		Werkzeug.SEITENSCHNEIDER: _status("Seitenschneider: Leitung anklicken, um sie zu entfernen.")
+		Werkzeug.ABMANTELN: _status("Abmantelungswerkzeug: Leitungsende am Bauteil anklicken.")
+		Werkzeug.ABISOLIEREN: _status("Abisolierzange (%d mm): abgemanteltes Leitungsende anklicken. Richtig sind 8 bis 12 mm." % abisolier_mm)
 
 # ---------------------------------------------------------------- Eingabe
 
@@ -298,6 +325,8 @@ func _klick(p: Vector3) -> void:
 		Werkzeug.LEITUNG: _leitung_klick(p)
 		Werkzeug.SCHELLE: _schelle_setzen(p)
 		Werkzeug.SEITENSCHNEIDER: _leitung_schneiden(p)
+		Werkzeug.ABMANTELN: _abmanteln(p)
+		Werkzeug.ABISOLIEREN: _abisolieren(p)
 
 # ---------------------------------------------------------------- Werkzeuge
 
@@ -507,6 +536,52 @@ func _leitung_schneiden(p: Vector3) -> void:
 		leitung_knoten.erase(l.id)
 	_status("%s entfernt." % l.id)
 
+## Leitungsende in der Naehe: [leitung, "start"/"ende"] oder [null, ""]
+func _leitungsende_bei(p: Vector3) -> Array:
+	var best: Array = [null, ""]
+	var best_d := 0.06
+	for l in circuit.leitungen:
+		var pts: Array = l.punkte
+		for ende in [["start", pts[0]], ["ende", pts[pts.size() - 1]]]:
+			var d := (ende[1] as Vector3).distance_to(p)
+			if d < best_d:
+				best_d = d
+				best = [l, ende[0]]
+	return best
+
+func _abmanteln(p: Vector3) -> void:
+	var e := _leitungsende_bei(p)
+	if e[0] == null:
+		_status("Kein Leitungsende in der Nähe (Bauteil anklicken, an dem die Leitung endet).")
+		return
+	var l: Dictionary = e[0]
+	if l.abgemantelt[e[1]]:
+		_status("%s ist an diesem Ende schon abgemantelt." % l.id)
+		return
+	l.abgemantelt[e[1]] = true
+	_leitung_zeichnen(l)
+	_status("%s abgemantelt (%s). Jetzt die Adern abisolieren." % [l.id, l.get(e[1] + "_geraet", "")])
+
+func _abisolieren(p: Vector3) -> void:
+	var e := _leitungsende_bei(p)
+	if e[0] == null:
+		_status("Kein Leitungsende in der Nähe.")
+		return
+	var l: Dictionary = e[0]
+	if not l.abgemantelt[e[1]]:
+		_status("Erst abmanteln! Mit der Abisolierzange kommt man nicht durch den Mantel.")
+		return
+	var feld := "abisoliert_von" if e[1] == "start" else "abisoliert_nach"
+	for a in l.adern:
+		a[feld] = abisolier_mm
+	_leitung_zeichnen(l)
+	var hinweis := ""
+	if abisolier_mm < Circuit.ABISOLIERLAENGE.x:
+		hinweis = " Achtung: zu kurz, die Klemme fasst evtl. nur die Isolierung."
+	elif abisolier_mm > Circuit.ABISOLIERLAENGE.y:
+		hinweis = " Achtung: zu lang, blankes Kupfer schaut aus der Klemme."
+	_status("%s: Adern %d mm abisoliert.%s" % [l.id, abisolier_mm, hinweis])
+
 # ---------------------------------------------------------------- Pruefen / Datei
 
 func _pruefen() -> void:
@@ -622,8 +697,40 @@ func _leitung_zeichnen(l: Dictionary) -> void:
 		sm.material_override = mat_schelle
 		sm.position = (s as Vector3) + Vector3(0, 0, r)
 		knoten.add_child(sm)
+	_adern_zeichnen(knoten, l, "start", r)
+	_adern_zeichnen(knoten, l, "ende", r)
 	add_child(knoten)
 	leitung_knoten[l.id] = knoten
+
+## Abgemanteltes Ende: Adern faechern 4 cm vor dem Geraet auf, abisolierte Spitzen in Kupfer
+func _adern_zeichnen(knoten: Node3D, l: Dictionary, ende: String, r: float) -> void:
+	if not l.abgemantelt.get(ende, false):
+		return
+	var pts: Array = l.punkte
+	if pts.size() < 2:
+		return
+	var spitze: Vector3 = pts[0] if ende == "start" else pts[pts.size() - 1]
+	var davor: Vector3 = pts[1] if ende == "start" else pts[pts.size() - 2]
+	var dir := (spitze - davor).normalized()
+	var seite := dir.cross(Vector3(0, 0, 1)).normalized()
+	var feld := "abisoliert_von" if ende == "start" else "abisoliert_nach"
+	var n: int = l.adern.size()
+	var kupfer := _mat(Color(0.85, 0.5, 0.25), 0.3)
+	for i in range(n):
+		var a: Dictionary = l.adern[i]
+		var versatz := seite * (float(i) - (n - 1) / 2.0) * 0.006
+		var von := spitze - dir * 0.05 + Vector3(0, 0, r)
+		var bis := spitze - dir * 0.012 + versatz + Vector3(0, 0, r + 0.004)
+		var mi := MeshInstance3D.new()
+		mi.mesh = _rohr([von, bis], 0.0014)
+		mi.material_override = _mat(ADERFARBE.get(a.farbe, Color.BLACK), 0.5)
+		knoten.add_child(mi)
+		var mm: float = a.get(feld, 0.0)
+		if mm > 0.0:
+			var cu := MeshInstance3D.new()
+			cu.mesh = _rohr([bis, bis + dir * mm / 1000.0], 0.0009)
+			cu.material_override = kupfer
+			knoten.add_child(cu)
 
 ## Rohr entlang der Punkte (auf dem Brett aufliegend)
 func _rohr(punkte: Array, r: float) -> ArrayMesh:
