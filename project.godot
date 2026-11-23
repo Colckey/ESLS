@@ -2,8 +2,8 @@
 config_version=5
 
 [application]
-config/name="ElektroSim Performancetest"
-run/main_scene="res://main.tscn"
+config/name="ESLS Brettmontage"
+run/main_scene="res://montage.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [display]

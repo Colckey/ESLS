@@ -32,6 +32,7 @@ static func speichern(c: Circuit, pfad: String, meta := {}) -> Error:
 	var daten := {
 		"format": "esls-projekt", "version": FORMAT_VERSION,
 		"meta": meta, "geraete": geraete, "leitungen": leitungen, "zustand": c.zustand,
+		"bohrungen": _v3(c.bohrungen),
 	}
 	var json := JSON.stringify(daten, "  ")
 	var zip := ZIPPacker.new()
@@ -62,6 +63,7 @@ static func laden(pfad: String) -> Dictionary:
 		l.punkte = _to_v3(l.get("punkte", []))
 		l.schellen = _to_v3(l.get("schellen", []))
 		c.leitung_hinzufuegen(l)
+	c.bohrungen = _to_v3(d.get("bohrungen", []))
 	for id in d.get("zustand", {}):
 		var z: Dictionary = d.zustand[id]
 		for k in z:

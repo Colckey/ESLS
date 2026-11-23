@@ -17,6 +17,7 @@ const TYPEN := {
 	"klemme":      ["a", "b", "c", "d", "e"],   # Verbindungsklemme: alle Klemmen leitend verbunden
 	"pe_schiene":  ["1", "2", "3", "4", "5", "6"],
 	"n_schiene":   ["1", "2", "3", "4", "5", "6"],
+	"abzweigdose": [],   # Gehaeuse; Klemmen darin sind eigene "klemme"-Geraete
 }
 
 ## Leitungstypen: Adern (Farben) und Querschnitt in mm²
@@ -32,11 +33,13 @@ const LEITUNGEN := {
 ## Maximaler LS-Nennstrom je Querschnitt (vereinfachte Verlegeart C, NYM auf Wand)
 const MAX_LS := {1.5: 16, 2.5: 20}
 const MAX_SCHELLENABSTAND := 0.25        # Meter
+const MAX_ENDABSTAND := 0.10             # erste/letzte Schelle hoechstens 10 cm vor Geraet/Dose
 const ABISOLIERLAENGE := Vector2(8, 12)  # mm, erlaubter Bereich
 
 var geraete := {}   # id -> {typ, pos, param:{}}
 var leitungen := []  # [{id, typ, punkte:[Vector3], schellen:[Vector3], abgemantelt:{start,ende}, adern:[{farbe, von, nach, abisoliert_von, abisoliert_nach}]}]
-var zustand := {}   # id -> {geschlossen: bool} fuer Schalter, {ausgeloest: bool} fuer LS/FI
+var zustand := {}
+var bohrungen := []  # [Vector3] gesetzte Bohrungen auf dem Brett
 
 # --- Union-Find -------------------------------------------------------------
 var _p := {}
@@ -85,6 +88,15 @@ func _montage_pruefen(r: Dictionary) -> void:
 			if (pts[i] as Vector3).distance_to(pts[i + 1]) > MAX_SCHELLENABSTAND + 0.001:
 				r.fehler.append("%s: Schellenabstand über %d cm." % [l.id, int(MAX_SCHELLENABSTAND * 100)])
 				break
+		var verlauf: Array = l.get("punkte", [])
+		if pts.size() >= 2 and verlauf.size() >= 2:
+			for ende in [verlauf[0], verlauf[verlauf.size() - 1]]:
+				var naechste := INF
+				for sp in pts:
+					naechste = minf(naechste, (sp as Vector3).distance_to(ende))
+				if naechste > MAX_ENDABSTAND + 0.001:
+					r.fehler.append("%s: Erste/letzte Iso-Schelle mehr als %d cm vom Gerät entfernt." % [l.id, int(MAX_ENDABSTAND * 100)])
+					break
 		var am: Dictionary = l.get("abgemantelt", {})
 		for a in l.adern:
 			if a.farbe not in info.adern:
