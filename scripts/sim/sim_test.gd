@@ -25,10 +25,13 @@ func _ready() -> void:
 	_check("N der Lampe vor dem FI angeklemmt -> FI loest aus", r, "fi1" in r.ausgeloest)
 
 	c = aufbau(); c.leitungen[1].adern[0].abisoliert_von = 0.0; r = _pruefe(c, 1)
-	_check("Nicht abisoliert -> Fehler", r, not r.ok)
+	_check("Nicht abisoliert -> Fehler, kein Kontakt, Lampe aus", r, not r.ok and r.lampen_an.is_empty())
+
+	c = aufbau(); c.leitungen[2].adern[0].farbe = "bk"; r = _pruefe(c, 1)
+	_check("Schwarze Ader in NYM-J 3x1,5 -> Fehler", r, not r.ok)
 
 	c = aufbau(); c.geraete["ls1"].param.nennstrom = 20; r = _pruefe(c, 1)
-	_check("LS 20A an 1,5 mm2 -> Fehler", r, not r.ok)
+	_check("LS 20A an 1,5 mm2 -> Fehler (genau einmal gemeldet)", r, not r.ok and r.fehler.size() == 1)
 
 	_speichern_laden()
 	ausgabe += "\n%s" % ("ALLE TESTS OK" if fehlgeschlagen == 0 else "%d TEST(S) FEHLGESCHLAGEN" % fehlgeschlagen)
@@ -54,11 +57,11 @@ func aufbau() -> Circuit:
 	var s := [Vector3(0, 0, 0), Vector3(0.2, 0, 0)]
 	c.leitung_hinzufuegen(_l("verteiler", "NYM-J 3x1,5", [
 		["bn", "netz:L", "fi1:L_in"], ["bu", "fi1:N_out", "dose_N:a"], ["gnye", "netz:PE", "dose_PE:a"]], s))
-	c.leitung_hinzufuegen(_l("w1", "NYM-J 3x1,5", [
+	c.leitung_hinzufuegen(_l("w1", "NYM-J 5x1,5", [
 		["bn", "fi1:L_out", "ls1:in"], ["bu", "netz:N", "fi1:N_in"], ["bk", "ls1:out", "dose_L:a"]], s))
 	c.leitung_hinzufuegen(_l("w2_lampe", "NYM-J 3x1,5", [
 		["bn", "dose_SR:b", "lampe1:L"], ["bu", "dose_N:b", "lampe1:N"], ["gnye", "dose_PE:b", "lampe1:PE"]], s))
-	c.leitung_hinzufuegen(_l("w3_schalter", "NYM-J 3x1,5", [
+	c.leitung_hinzufuegen(_l("w3_schalter", "NYM-J 5x1,5", [
 		["bn", "dose_L:b", "s1:L"], ["bk", "s1:1", "dose_SR:a"]], s))
 	return c
 

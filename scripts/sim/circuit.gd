@@ -87,6 +87,8 @@ func _montage_pruefen(r: Dictionary) -> void:
 				break
 		var am: Dictionary = l.get("abgemantelt", {})
 		for a in l.adern:
+			if a.farbe not in info.adern:
+				r.fehler.append("%s: %s hat keine Ader mit Farbe %s." % [l.id, l.typ, a.farbe])
 			for ende in ["von", "nach"]:
 				if a.get(ende, "") == "":
 					continue
@@ -112,12 +114,14 @@ func _montage_pruefen(r: Dictionary) -> void:
 				if ist_n and a.farbe != "bu":
 					r.warnungen.append("%s: Neutralleiter an %s sollte blau sein." % [l.id, a[ende]])
 		# Querschnitt vs. LS
+		var gemeldet := {}
 		for a in l.adern:
 			for ende in ["von", "nach"]:
 				var k: String = a.get(ende, "")
-				if k != "" and _typ(k) == "ls":
+				if k != "" and _typ(k) == "ls" and not gemeldet.has(k.get_slice(":", 0)):
 					var nenn: int = geraete[k.get_slice(":", 0)].param.get("nennstrom", 16)
 					if nenn > MAX_LS.get(info.qs, 0):
+						gemeldet[k.get_slice(":", 0)] = true
 						r.fehler.append("%s: %s mm² ist mit LS %dA nicht ausreichend abgesichert." % [l.id, str(info.qs), nenn])
 
 func _netz_pruefen(r: Dictionary) -> void:
@@ -139,9 +143,13 @@ func _netz_pruefen(r: Dictionary) -> void:
 				for k in ks: _union(id + ":" + k, id + ":" + ks[0])
 	# FI wird NICHT vereint: Ein- und Ausgang bleiben getrennte Knoten,
 	# damit man sieht, ob Hin- und Rueckstrom beide durch den FI fliessen.
+	# Nur abgemantelte und abisolierte Aderenden haben Kontakt in der Klemme
 	for l in leitungen:
+		var am: Dictionary = l.get("abgemantelt", {})
 		for a in l.adern:
-			if a.get("von", "") != "" and a.get("nach", "") != "":
+			if a.get("von", "") != "" and a.get("nach", "") != "" \
+					and am.get("start", false) and am.get("ende", false) \
+					and a.get("abisoliert_von", 0.0) > 0.0 and a.get("abisoliert_nach", 0.0) > 0.0:
 				_union(a.von, a.nach)
 	if quelle == "":
 		r.fehler.append("Keine Einspeisung vorhanden.")
