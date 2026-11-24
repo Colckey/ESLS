@@ -7,10 +7,19 @@ mit auslösendem LS/FI. Godot 4.7, Kompatibilitäts-Renderer (läuft auf schwach
 ## Starten
 Godot 4.7 öffnen → Projekt importieren → `project.godot` → **F5** (Hauptszene `montage.tscn`).
 
+## Oberfläche
+![Oberfläche](docs/oberflaeche.png)
+
+- **Links: Bauteile** als Kacheln, sortiert nach Verteiler, Schalter und Taster, Dosen und Verbraucher. Kachel anklicken, dann aufs Brett klicken.
+- **Rechts: Werkzeuge** in Arbeitsreihenfolge (Vorbereiten, Verlegen, Anschließen), mit Tasten **1–8**. Leitungstyp und Abisolierlänge stehen direkt beim Werkzeug.
+- **Oben**: Name, Neu/Laden/Speichern, Lehrermodus, **Prüfen** (Taste **P**).
+- **Unten**: aktives Werkzeug und Hinweis zum nächsten Schritt.
+- **Pos1** oder „Ansicht zurücksetzen“ holt das ganze Brett wieder ins Bild.
+
 ## Ablauf einer Montage
 1. **Bohrmaschine**: Bohrungen setzen (unter jedes Bauteil 2, unter LS/Zeitrelais 1, unter jede Schelle 1)
-2. **Bauteil setzen**: Typ in der Liste wählen, aufs Brett klicken
-3. **Leitung verlegen**: Leitungstyp wählen, Start-Bauteil → Eckpunkte → Ziel-Bauteil
+2. **Bauteil setzen**: Kachel links wählen, aufs Brett klicken
+3. **Leitung verlegen**: Leitungstyp unter dem Werkzeug wählen, Start-Bauteil → Eckpunkte → Ziel-Bauteil
 4. **Iso-Schelle**: auf die Leitung über einer Bohrung klicken (max. 25 cm Abstand, max. 10 cm vor dem Gerät)
 5. **Abmantelungswerkzeug**, dann **Abisolierzange** (Länge einstellen, richtig sind 8–12 mm): Bauteil anklicken
 6. **Schraubendreher**: Bauteil anklicken → Nahansicht → Ader links, Klemme rechts anklicken

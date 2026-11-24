@@ -37,6 +37,25 @@ const BAUTEILE := {
 }
 const SETZBAR := ["fi", "ls", "abzweigdose", "ausschalter", "wechselschalter", "kreuzschalter", "taster", "taster_aus",
 	"steckdose", "lampe", "schuetz", "zeitrelais"]
+## Bauteil-Raster links, nach Kategorien sortiert
+const KATEGORIEN := [
+	["Verteiler", ["fi", "ls", "schuetz", "zeitrelais"]],
+	["Schalter und Taster", ["ausschalter", "wechselschalter", "kreuzschalter", "taster", "taster_aus"]],
+	["Dosen und Verbraucher", ["abzweigdose", "steckdose", "lampe"]],
+]
+const KACHEL_NAME := {"fi": "FI-Schalter", "ls": "LS B16", "zeitrelais": "Zeitrelais", "taster": "Taster (S)",
+	"taster_aus": "Taster (Ö)", "lampe": "Lampe"}
+## Werkzeugleiste rechts in Arbeitsreihenfolge: [Werkzeug, Name, Taste]
+const WERKZEUG_GRUPPEN := [
+	["Vorbereiten", [[Werkzeug.AUSWAHL, "Auswahl", "1"], [Werkzeug.BOHRER, "Bohrmaschine", "2"]]],
+	["Verlegen", [[Werkzeug.LEITUNG, "Leitung verlegen", "3"], [Werkzeug.SCHELLE, "Iso-Schelle", "4"],
+		[Werkzeug.SEITENSCHNEIDER, "Seitenschneider", "5"]]],
+	["Anschließen", [[Werkzeug.ABMANTELN, "Abmantelungswerkzeug", "6"], [Werkzeug.ABISOLIEREN, "Abisolierzange", "7"],
+		[Werkzeug.ANKLEMMEN, "Schraubendreher", "8"]]],
+]
+const WERKZEUG_NAME := {Werkzeug.AUSWAHL: "Auswahl", Werkzeug.BOHRER: "Bohrmaschine", Werkzeug.BAUTEIL: "Bauteil setzen",
+	Werkzeug.LEITUNG: "Leitung verlegen", Werkzeug.SCHELLE: "Iso-Schelle", Werkzeug.SEITENSCHNEIDER: "Seitenschneider",
+	Werkzeug.ABMANTELN: "Abmantelungswerkzeug", Werkzeug.ABISOLIEREN: "Abisolierzange", Werkzeug.ANKLEMMEN: "Schraubendreher"}
 const KUERZEL := {"fi": "fi", "ls": "ls", "abzweigdose": "dose", "ausschalter": "s", "wechselschalter": "ws",
 	"kreuzschalter": "x", "taster": "t", "taster_aus": "t0", "steckdose": "sd", "lampe": "lampe", "schuetz": "k", "zeitrelais": "kt"}
 
@@ -55,7 +74,8 @@ var verlege_punkte: Array = []
 var cam: Camera3D
 var cam_yaw := 0.0
 var cam_pitch := 0.0
-var cam_dist := 1.25
+const CAM_START_DIST := 1.38
+var cam_dist := CAM_START_DIST
 var cam_target := Vector3.ZERO
 
 # Szene
@@ -66,8 +86,16 @@ var vorschau: MeshInstance3D
 var cursor_marker: MeshInstance3D
 
 # UI
+const PANEL_BREITE := 240
+var ui_wurzel: Control
+var mitte: Control
 var status: Label
+var werkzeug_anzeige: Label
 var ergebnis: RichTextLabel
+var ergebnis_karte: PanelContainer
+var ergebnis_titel: Label
+var kopfleiste: Control
+var bauteil_kacheln := {}
 var datei_dialog: FileDialog
 var werkzeug_knoepfe := {}
 var name_feld: LineEdit
@@ -158,83 +186,33 @@ func _kamera_aktualisieren() -> void:
 func _ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
-	var zeilen := VBoxContainer.new()
-	zeilen.position = Vector2(8, 8)
-	layer.add_child(zeilen)
-	var leiste := HBoxContainer.new()
-	leiste.add_theme_constant_override("separation", 6)
-	zeilen.add_child(leiste)
-	var leiste2 := HBoxContainer.new()
-	leiste2.add_theme_constant_override("separation", 6)
-	zeilen.add_child(leiste2)
+	ui_wurzel = Control.new()
+	ui_wurzel.theme = Stil.theme()
+	ui_wurzel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui_wurzel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(ui_wurzel)
 
-	for w in [[Werkzeug.AUSWAHL, "Auswahl"], [Werkzeug.BOHRER, "Bohrmaschine"], [Werkzeug.BAUTEIL, "Bauteil setzen"],
-			[Werkzeug.LEITUNG, "Leitung verlegen"], [Werkzeug.SCHELLE, "Iso-Schelle"], [Werkzeug.SEITENSCHNEIDER, "Seitenschneider"],
-			[Werkzeug.ABMANTELN, "Abmantelungswerkzeug"], [Werkzeug.ABISOLIEREN, "Abisolierzange"],
-			[Werkzeug.ANKLEMMEN, "Schraubendreher (Anklemmen)"]]:
-		var b := Button.new()
-		b.text = w[1]
-		b.toggle_mode = true
-		b.focus_mode = Control.FOCUS_NONE   # sonst loest die Leertaste den Knopf aus
-		b.pressed.connect(_werkzeug_waehlen.bind(w[0]))
-		leiste.add_child(b)
-		werkzeug_knoepfe[w[0]] = b
+	var spalte := VBoxContainer.new()
+	spalte.set_anchors_preset(Control.PRESET_FULL_RECT)
+	spalte.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	spalte.add_theme_constant_override("separation", 0)
+	ui_wurzel.add_child(spalte)
 
-	var bt := OptionButton.new()
-	for t in SETZBAR:
-		bt.add_item(BAUTEILE[t].name)
-	bt.item_selected.connect(func(i: int) -> void:
-		bauteil_typ = SETZBAR[i]
-		_werkzeug_waehlen(Werkzeug.BAUTEIL))
-	leiste2.add_child(bt)
-
-	var lt := OptionButton.new()
-	var namen: Array = Circuit.LEITUNGEN.keys()
-	for n in namen:
-		lt.add_item(n)
-	lt.item_selected.connect(func(i: int) -> void:
-		leitung_typ = namen[i]
-		_werkzeug_waehlen(Werkzeug.LEITUNG))
-	leiste2.add_child(lt)
-
-	var lbl_mm := Label.new()
-	lbl_mm.text = "Abisolierlänge:"
-	leiste2.add_child(lbl_mm)
-	var mm := SpinBox.new()
-	mm.min_value = 2
-	mm.max_value = 30
-	mm.step = 1
-	mm.value = abisolier_mm
-	mm.suffix = "mm"
-	mm.value_changed.connect(func(v: float) -> void: abisolier_mm = v)
-	leiste2.add_child(mm)
-
-	var name_lbl := Label.new()
-	name_lbl.text = "Name:"
-	leiste2.add_child(name_lbl)
-	name_feld = LineEdit.new()
-	name_feld.placeholder_text = "Vor- und Nachname"
-	name_feld.custom_minimum_size = Vector2(160, 0)
-	leiste2.add_child(name_feld)
-	for a in [["Prüfen", _pruefen], ["Speichern", _speichern_dialog], ["Laden", _laden_dialog], ["Neu", _neues_projekt],
-			["Lehrermodus", _lehrermodus]]:
-		var b := Button.new()
-		b.text = a[0]
-		b.focus_mode = Control.FOCUS_NONE
-		b.pressed.connect(a[1])
-		leiste2.add_child(b)
-
-	status = Label.new()
-	status.position = Vector2(8, 80)
-	status.add_theme_color_override("font_color", Color.WHITE)
-	layer.add_child(status)
-
-	ergebnis = RichTextLabel.new()
-	ergebnis.position = Vector2(8, 108)
-	ergebnis.size = Vector2(520, 300)
-	ergebnis.bbcode_enabled = true
-	ergebnis.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(ergebnis)
+	kopfleiste = _kopfleiste()
+	spalte.add_child(kopfleiste)
+	var mitte_zeile := HBoxContainer.new()
+	mitte_zeile.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	mitte_zeile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mitte_zeile.add_theme_constant_override("separation", 0)
+	spalte.add_child(mitte_zeile)
+	mitte_zeile.add_child(_bauteil_panel())
+	mitte = Control.new()   # freie Sicht aufs Brett, Klicks gehen durch
+	mitte.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mitte.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mitte_zeile.add_child(mitte)
+	mitte_zeile.add_child(_werkzeug_panel())
+	spalte.add_child(_statusleiste())
+	mitte.add_child(_ergebnis_karte())
 
 	datei_dialog = FileDialog.new()
 	datei_dialog.access = FileDialog.ACCESS_FILESYSTEM
@@ -243,6 +221,252 @@ func _ui() -> void:
 	datei_dialog.file_selected.connect(_datei_gewaehlt)
 	layer.add_child(datei_dialog)
 	_werkzeug_waehlen(Werkzeug.AUSWAHL)
+
+## Oben: Titel, Schuelername, Datei-Knoepfe, Pruefen
+func _kopfleiste() -> Control:
+	var kopf := PanelContainer.new()
+	kopf.add_theme_stylebox_override("panel", Stil.box(Stil.HINTERGRUND, 0, Stil.RAND, 0, Vector2(14, 8)))
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 8)
+	kopf.add_child(h)
+	var logo := Label.new()
+	logo.text = "⚡"
+	logo.add_theme_color_override("font_color", Stil.AKZENT)
+	logo.add_theme_font_size_override("font_size", 20)
+	h.add_child(logo)
+	var titel := Label.new()
+	titel.text = "ESLS Brettmontage"
+	titel.theme_type_variation = "Titel"
+	h.add_child(titel)
+	var platz := Control.new()
+	platz.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(platz)
+	var name_lbl := Label.new()
+	name_lbl.text = "Name"
+	name_lbl.theme_type_variation = "Leise"
+	h.add_child(name_lbl)
+	name_feld = LineEdit.new()
+	name_feld.placeholder_text = "Vor- und Nachname"
+	name_feld.custom_minimum_size = Vector2(190, 0)
+	h.add_child(name_feld)
+	h.add_child(VSeparator.new())
+	for a in [["Neu", _neues_projekt], ["Laden", _laden_dialog], ["Speichern", _speichern_dialog]]:
+		h.add_child(_knopf(a[0], a[1]))
+	h.add_child(VSeparator.new())
+	h.add_child(_knopf("Lehrermodus", _lehrermodus))
+	var pruefen := _knopf("Prüfen", _pruefen)
+	pruefen.theme_type_variation = "AkzentButton"
+	pruefen.tooltip_text = "Schaltung prüfen (Taste P)"
+	h.add_child(pruefen)
+	return kopf
+
+func _knopf(text: String, aktion: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE   # sonst loest die Leertaste den Knopf aus
+	b.pressed.connect(aktion)
+	return b
+
+## Links: Bauteile als Kacheln, nach Kategorien sortiert
+func _bauteil_panel() -> Control:
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", Stil.box(Stil.HINTERGRUND, 0, Stil.RAND, 0, Vector2(10, 10)))
+	panel.custom_minimum_size = Vector2(PANEL_BREITE, 0)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.add_child(scroll)
+	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_theme_constant_override("separation", 6)
+	scroll.add_child(v)
+	var titel := Label.new()
+	titel.text = "Bauteile"
+	titel.theme_type_variation = "Titel"
+	v.add_child(titel)
+	v.add_theme_constant_override("separation", 4)
+	for kat in KATEGORIEN:
+		v.add_child(Stil.ueberschrift(kat[0]))
+		var raster := GridContainer.new()
+		raster.columns = 2
+		raster.add_theme_constant_override("h_separation", 6)
+		raster.add_theme_constant_override("v_separation", 6)
+		v.add_child(raster)
+		for typ in kat[1]:
+			raster.add_child(_bauteil_kachel(typ))
+	return panel
+
+func _bauteil_kachel(typ: String) -> Button:
+	var b := Button.new()
+	b.toggle_mode = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(102, 66)
+	b.tooltip_text = "%s setzen" % BAUTEILE[typ].name
+	b.pressed.connect(func() -> void:
+		bauteil_typ = typ
+		_werkzeug_waehlen(Werkzeug.BAUTEIL))
+	var v := VBoxContainer.new()
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.offset_top = 3
+	v.offset_bottom = -3
+	v.add_theme_constant_override("separation", 0)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(v)
+	var sym := BauteilSymbol.new()
+	sym.typ = typ
+	sym.farbe = BAUTEILE[typ].farbe
+	sym.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	v.add_child(sym)
+	var l := Label.new()
+	l.text = KACHEL_NAME.get(typ, BAUTEILE[typ].name)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_font_size_override("font_size", 12)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(l)
+	bauteil_kacheln[typ] = b
+	return b
+
+## Rechts: Werkzeuge in Arbeitsreihenfolge, mit Tastenkuerzel und Einstellungen
+func _werkzeug_panel() -> Control:
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", Stil.box(Stil.HINTERGRUND, 0, Stil.RAND, 0, Vector2(10, 10)))
+	panel.custom_minimum_size = Vector2(PANEL_BREITE, 0)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.add_child(scroll)
+	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_theme_constant_override("separation", 4)
+	scroll.add_child(v)
+	var titel := Label.new()
+	titel.text = "Werkzeuge"
+	titel.theme_type_variation = "Titel"
+	v.add_child(titel)
+	for gruppe in WERKZEUG_GRUPPEN:
+		v.add_child(Stil.ueberschrift(gruppe[0]))
+		for w in gruppe[1]:
+			v.add_child(_werkzeug_knopf(w[0], w[1], w[2]))
+			if w[0] == Werkzeug.LEITUNG:
+				var lt := OptionButton.new()
+				lt.focus_mode = Control.FOCUS_NONE
+				var namen: Array = Circuit.LEITUNGEN.keys()
+				for n in namen:
+					lt.add_item(n)
+				lt.tooltip_text = "Leitungstyp"
+				lt.item_selected.connect(func(i: int) -> void:
+					leitung_typ = namen[i]
+					_werkzeug_waehlen(Werkzeug.LEITUNG))
+				v.add_child(_einrueckung(lt))
+			elif w[0] == Werkzeug.ABISOLIEREN:
+				var zeile := HBoxContainer.new()
+				var lbl := Label.new()
+				lbl.text = "Länge"
+				lbl.theme_type_variation = "Leise"
+				zeile.add_child(lbl)
+				var mm := SpinBox.new()
+				mm.min_value = 2
+				mm.max_value = 30
+				mm.step = 1
+				mm.value = abisolier_mm
+				mm.suffix = "mm"
+				mm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				mm.value_changed.connect(func(wert: float) -> void:
+					abisolier_mm = wert
+					if werkzeug == Werkzeug.ABISOLIEREN:
+						_werkzeug_waehlen(Werkzeug.ABISOLIEREN))
+				zeile.add_child(mm)
+				v.add_child(_einrueckung(zeile))
+	v.add_child(HSeparator.new())
+	v.add_child(Stil.ueberschrift("Ansicht"))
+	var ansicht := _knopf("Ansicht zurücksetzen", _ansicht_zuruecksetzen)
+	ansicht.tooltip_text = "Taste Pos1"
+	v.add_child(ansicht)
+	var hilfe := Label.new()
+	hilfe.theme_type_variation = "Leise"
+	hilfe.autowrap_mode = TextServer.AUTOWRAP_WORD
+	hilfe.text = "Rechte Maustaste: drehen\nMittlere Maustaste: verschieben\nMausrad: zoomen  ·  P: prüfen\nEsc: abbrechen  ·  Entf: löschen\nLeertaste: Schalter bedienen"
+	v.add_child(hilfe)
+	return panel
+
+func _einrueckung(c: Control) -> Control:
+	var rand := MarginContainer.new()
+	rand.add_theme_constant_override("margin_left", 14)
+	rand.add_theme_constant_override("margin_bottom", 4)
+	rand.add_child(c)
+	return rand
+
+func _werkzeug_knopf(w: int, text: String, taste: String) -> Button:
+	var b := Button.new()
+	b.toggle_mode = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(0, 32)
+	b.text = text
+	b.add_theme_font_size_override("font_size", 14)
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.tooltip_text = "%s (Taste %s)" % [text, taste]
+	b.pressed.connect(_werkzeug_waehlen.bind(w))
+	var k := Label.new()
+	k.text = taste
+	k.theme_type_variation = "Leise"
+	k.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
+	k.offset_left = -22
+	k.offset_right = -10
+	k.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(k)
+	werkzeug_knoepfe[w] = b
+	return b
+
+## Unten: aktueller Hinweis
+func _statusleiste() -> Control:
+	var leiste := PanelContainer.new()
+	leiste.add_theme_stylebox_override("panel", Stil.box(Color(0.08, 0.085, 0.10, 0.97), 0, Stil.RAND, 0, Vector2(14, 7)))
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 10)
+	leiste.add_child(h)
+	werkzeug_anzeige = Label.new()
+	werkzeug_anzeige.add_theme_color_override("font_color", Stil.AKZENT)
+	h.add_child(werkzeug_anzeige)
+	h.add_child(VSeparator.new())
+	status = Label.new()
+	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	h.add_child(status)
+	return leiste
+
+## Pruefergebnis als Karte unten links ueber dem Brett
+func _ergebnis_karte() -> Control:
+	ergebnis_karte = PanelContainer.new()
+	ergebnis_karte.theme_type_variation = "Karte"
+	var v := VBoxContainer.new()
+	ergebnis_karte.add_child(v)
+	var kopf := HBoxContainer.new()
+	v.add_child(kopf)
+	ergebnis_titel = Label.new()
+	ergebnis_titel.theme_type_variation = "Titel"
+	ergebnis_titel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	kopf.add_child(ergebnis_titel)
+	kopf.add_child(_knopf("Schließen", func() -> void: ergebnis_karte.hide()))
+	ergebnis = RichTextLabel.new()
+	ergebnis.bbcode_enabled = true
+	ergebnis.custom_minimum_size = Vector2(440, 0)
+	ergebnis.fit_content = true
+	ergebnis.selection_enabled = true
+	v.add_child(ergebnis)
+	ergebnis_karte.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 12)
+	ergebnis_karte.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	ergebnis_karte.hide()
+	return ergebnis_karte
+
+func _ergebnis_setzen(t: String, titel := "Hinweis") -> void:
+	ergebnis_titel.text = titel
+	ergebnis.text = t
+	ergebnis_karte.visible = t != ""
+
+func _ansicht_zuruecksetzen() -> void:
+	cam_target = Vector3.ZERO
+	cam_dist = CAM_START_DIST
+	cam_yaw = 0.0
+	cam_pitch = 0.0
+	_kamera_aktualisieren()
 
 func _lehrermodus() -> void:
 	get_tree().change_scene_to_file("res://lehrer.tscn")
@@ -253,7 +477,7 @@ func _neues_projekt() -> void:
 	circuit = Circuit.new()
 	circuit.geraet_hinzufuegen("netz", "einspeisung", Vector3(-0.5, 0.3, 0))
 	_alles_neu_zeichnen()
-	ergebnis.text = ""
+	_ergebnis_setzen("")
 	_status("Neues Projekt. Tipp: Erst bohren, dann Bauteile setzen.")
 
 func _alles_neu_zeichnen() -> void:
@@ -279,6 +503,10 @@ func _werkzeug_waehlen(w: int) -> void:
 	werkzeug = w
 	for k in werkzeug_knoepfe:
 		werkzeug_knoepfe[k].button_pressed = (k == w)
+	for t in bauteil_kacheln:
+		bauteil_kacheln[t].button_pressed = (w == Werkzeug.BAUTEIL and t == bauteil_typ)
+	if werkzeug_anzeige:
+		werkzeug_anzeige.text = BAUTEILE[bauteil_typ].name if w == Werkzeug.BAUTEIL else WERKZEUG_NAME[w]
 	verlege_start = ""
 	verlege_punkte.clear()
 	match w:
@@ -340,6 +568,16 @@ func _unhandled_input(ev: InputEvent) -> void:
 			verlege_punkte.clear()
 			_vorschau_zeichnen(Vector3.ZERO)
 			_status("Abgebrochen.")
+		elif k.keycode >= KEY_1 and k.keycode <= KEY_8:
+			var nr := str(k.keycode - KEY_0)
+			for gruppe in WERKZEUG_GRUPPEN:
+				for w in gruppe[1]:
+					if w[2] == nr:
+						_werkzeug_waehlen(w[0])
+		elif k.keycode == KEY_P:
+			_pruefen()
+		elif k.keycode == KEY_HOME:
+			_ansicht_zuruecksetzen()
 		elif k.keycode == KEY_DELETE and ausgewaehlt != "":
 			_geraet_entfernen(ausgewaehlt)
 		elif k.keycode == KEY_SPACE and ausgewaehlt != "" and circuit.zustand.get(ausgewaehlt, {}).has("stellung"):
@@ -650,7 +888,15 @@ func _nahansicht_oeffnen(id: String) -> void:
 	if nahansicht == null:
 		nahansicht = Nahansicht.new()
 		nahansicht.montage = self
-		status.get_parent().add_child(nahansicht)
+		ui_wurzel.add_child(nahansicht)
+		nahansicht.visibility_changed.connect(func() -> void:
+			if not nahansicht.visible:
+				_ansicht_zuruecksetzen())
+	# rechts ueber der Werkzeugleiste, links bleibt das Bauteil sichtbar
+	nahansicht.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	nahansicht.offset_right = -10
+	nahansicht.offset_left = -10 - nahansicht.custom_minimum_size.x
+	nahansicht.offset_top = maxf(kopfleiste.size.y, 50) + 8
 	nahansicht.oeffnen(id)
 
 ## Wird von der Nahansicht nach jeder Aenderung aufgerufen
@@ -662,7 +908,7 @@ func nahansicht_geaendert() -> void:
 
 func _pruefen() -> void:
 	var r := circuit.pruefen()
-	var t := "[b]Prüfergebnis:[/b] %s\n" % ("[color=lime]in Ordnung[/color]" if r.ok else "[color=tomato]Fehler gefunden[/color]")
+	var t := "%s\n" % ("[color=lime]Alles in Ordnung[/color]" if r.ok else "[color=tomato]Fehler gefunden:[/color]")
 	for a in r.ausgeloest:
 		t += "[color=orange]>> %s hat ausgelöst[/color]\n" % a
 	for f in r.fehler:
@@ -673,7 +919,7 @@ func _pruefen() -> void:
 		t += "[color=lime]Leuchtet: %s[/color]\n" % ", ".join(r.lampen_an)
 	if not r.spulen_an.is_empty():
 		t += "[color=lime]Angezogen: %s[/color]\n" % ", ".join(r.spulen_an)
-	ergebnis.text = t
+	_ergebnis_setzen(t, "Prüfergebnis")
 	# Sichtbar machen: Lampe leuchtet, ausgeloeste Schutzgeraete rot
 	for gid in geraete_knoten:
 		var mi := (geraete_knoten[gid] as Node3D).get_child(0) as MeshInstance3D
@@ -713,7 +959,7 @@ func _datei_gewaehlt(pfad: String) -> void:
 		geladene_meta = d.meta
 		name_feld.text = d.meta.get("schueler", "")
 		_alles_neu_zeichnen()
-		ergebnis.text = "" if d.unveraendert else "[color=orange]Hinweis: Datei wurde außerhalb von ESLS verändert.[/color]"
+		_ergebnis_setzen("" if d.unveraendert else "[color=orange]Hinweis: Datei wurde außerhalb von ESLS verändert.[/color]")
 		_status("Geladen: %s" % pfad)
 
 # ---------------------------------------------------------------- Zeichnen

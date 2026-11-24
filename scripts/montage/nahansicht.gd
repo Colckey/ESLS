@@ -25,16 +25,13 @@ var _extra: HBoxContainer
 func _ready() -> void:
 	position = Vector2(560, 90)
 	custom_minimum_size = Vector2(700, 560)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.1, 0.11, 0.13, 0.93)
-	sb.set_corner_radius_all(8)
-	sb.set_content_margin_all(12)
-	add_theme_stylebox_override("panel", sb)
+	add_theme_stylebox_override("panel", Stil.box(Stil.HINTERGRUND, 10, Stil.AKZENT.darkened(0.3), 1, Vector2(14, 12)))
 	var v := VBoxContainer.new()
 	add_child(v)
 	var kopf := HBoxContainer.new()
 	v.add_child(kopf)
 	_titel = Label.new()
+	_titel.theme_type_variation = "Titel"
 	_titel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	kopf.add_child(_titel)
 	var zu := Button.new()
@@ -42,6 +39,7 @@ func _ready() -> void:
 	zu.pressed.connect(func() -> void: hide())
 	kopf.add_child(zu)
 	_hinweis = Label.new()
+	_hinweis.theme_type_variation = "Leise"
 	_hinweis.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_hinweis.custom_minimum_size = Vector2(670, 40)
 	v.add_child(_hinweis)

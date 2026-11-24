@@ -15,6 +15,7 @@ var _lade_muster := false
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	theme = Stil.theme()
 	var bg := ColorRect.new()
 	bg.color = Color(0.13, 0.14, 0.16)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -26,8 +27,10 @@ func _ready() -> void:
 	var titel := Label.new()
 	titel.text = "ESLS Lehrermodus"
 	titel.add_theme_font_size_override("font_size", 24)
+	titel.add_theme_color_override("font_color", Stil.AKZENT)
 	v.add_child(titel)
 	var leiste := HBoxContainer.new()
+	leiste.add_theme_constant_override("separation", 8)
 	v.add_child(leiste)
 	for b in [["Schülerdatei öffnen", _schueler_oeffnen], ["Musterlösung öffnen (optional)", _muster_oeffnen],
 			["Bewerten", _bewerten], ["Zurück zur Montage", _zurueck]]:
