@@ -16,6 +16,8 @@ func _initialize() -> void:
 				n.cam_target = Vector3(float(w[0]), float(w[1]), 0)
 				n.cam_dist = float(w[2])
 				n._kamera_aktualisieren()
+			elif ";" in teil:   # methode;argument
+				n.call(teil.get_slice(";", 0), teil.get_slice(";", 1))
 			elif n.has_method(teil): n.call(teil)
 	for i in 10: await process_frame
 	await RenderingServer.frame_post_draw

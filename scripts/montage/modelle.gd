@@ -76,6 +76,33 @@ static func schrift(p: Node3D, text: String, pos: Vector3, groesse := 20, farbe 
 	p.add_child(l)
 	return l
 
+## Fasst alle direkten Mesh-Kinder mit gleichem Material zu einem Mesh zusammen
+## (weniger Zeichenaufrufe = fluessiger auf schwachen Grafikkarten).
+## Teile, die sich bewegen oder leuchten (Metadaten), bleiben einzeln.
+static func zusammenfassen(n: Node3D) -> void:
+	var bleiben := []
+	for k in ["wippe", "hebel", "glas", "licht", "led", "koerper"]:
+		if n.has_meta(k): bleiben.append(n.get_meta(k))
+	var gruppen := {}
+	for k in n.get_children():
+		if k is MeshInstance3D and not k in bleiben and (k as MeshInstance3D).material_override != null:
+			var mi := k as MeshInstance3D
+			if not gruppen.has(mi.material_override): gruppen[mi.material_override] = []
+			gruppen[mi.material_override].append(mi)
+	for m in gruppen:
+		var liste: Array = gruppen[m]
+		if liste.size() < 2:
+			continue
+		var st := SurfaceTool.new()
+		for mi in liste:
+			st.append_from(mi.mesh, 0, mi.transform)
+			n.remove_child(mi)
+			mi.free()
+		var neu := MeshInstance3D.new()
+		neu.mesh = st.commit()
+		neu.material_override = m
+		n.add_child(neu)
+
 # ---------------------------------------------------------------- Geraete
 
 ## Baut das Modell eines Geraets. Rueckgabe-Knoten hat Metadaten fuer die Zustandsanzeige:
@@ -96,6 +123,7 @@ static func geraet(typ: String, gr: Vector3, param := {}) -> Node3D:
 		"lampe": _lampe(n, gr)
 		_:
 			n.set_meta("koerper", box(n, gr, Vector3(0, 0, gr.z / 2), mat(WEISS)))
+	zusammenfassen(n)
 	return n
 
 static func _klemmenblock(n: Node3D, gr: Vector3, farben: Array, namen: Array) -> void:

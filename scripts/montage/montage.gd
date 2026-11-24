@@ -150,6 +150,9 @@ func _ready() -> void:
 	_ui()
 	_neues_projekt()
 	_auftrag_anzeigen()
+	if Musterbrett.beim_start:
+		Musterbrett.beim_start = false
+		musterbrett_zeigen.call_deferred()
 
 # ---------------------------------------------------------------- Aufbau
 
@@ -210,10 +213,13 @@ func _grafik_setzen(hoch: bool) -> void:
 		get_viewport().msaa_3d = Viewport.MSAA_2X if hoch else Viewport.MSAA_DISABLED
 
 func _brett() -> void:
-	Modelle.brett(self, BOARD_W, BOARD_H)
-	Modelle.kabelkanal(self, Circuit.KABELKANAL)
-	Modelle.verteiler(self, Circuit.VERTEILER_FELD, REIHEN)
-	Modelle.einspeisung_cee(self, Vector3(-0.50, -0.37, 0), Circuit.VERTEILER_FELD.position.y)
+	var deko := Node3D.new()
+	add_child(deko)
+	Modelle.brett(deko, BOARD_W, BOARD_H)
+	Modelle.kabelkanal(deko, Circuit.KABELKANAL)
+	Modelle.verteiler(deko, Circuit.VERTEILER_FELD, REIHEN)
+	Modelle.einspeisung_cee(deko, Vector3(-0.50, -0.37, 0), Circuit.VERTEILER_FELD.position.y)
+	Modelle.zusammenfassen(deko)
 	bohr_knoten = Node3D.new()
 	add_child(bohr_knoten)
 	vorschau = MeshInstance3D.new()
@@ -419,9 +425,17 @@ func schritte() -> Array:
 		["Geprüft", _geprueft, "Prüfen ohne Fehler und Funktion wie im Auftrag"],
 	]
 
+var _schritte_ausstehend := false
+
+## Arbeitsschritte hoechstens einmal pro Bild neu berechnen
 func _schritte_aktualisieren() -> void:
-	if schritte_box == null:
+	if schritte_box == null or _schritte_ausstehend:
 		return
+	_schritte_ausstehend = true
+	_schritte_jetzt.call_deferred()
+
+func _schritte_jetzt() -> void:
+	_schritte_ausstehend = false
 	for k in schritte_box.get_children():
 		k.queue_free()
 	var nr := 1
@@ -1275,7 +1289,6 @@ func _nahansicht_oeffnen(id: String) -> void:
 func nahansicht_geaendert() -> void:
 	for l in circuit.leitungen:
 		_leitung_zeichnen(l)
-	_geraete_neu_zeichnen()
 	_geprueft = false
 	_schritte_aktualisieren()
 
@@ -1390,11 +1403,20 @@ func _geraet_zeichnen(id: String) -> void:
 	knoten.position = g.pos
 	if not g.typ in ["einspeisung", "n_schiene", "pe_schiene"]:
 		Modelle.schild(knoten, id, info.groesse)
+		Modelle.zusammenfassen(knoten)
 	add_child(knoten)
 	geraete_knoten[id] = knoten
 	Modelle.zustand_zeigen(knoten, g.typ, circuit.zustand.get(id, {}), false, false, false)
 
-## Geraete neu zeichnen (z. B. neue Klemmen in der Abzweigdose), Auswahl bleibt
+## Abzweigdose neu zeichnen (neue Verbindungsklemme sichtbar)
+func dose_neu_zeichnen(id: String) -> void:
+	if geraete_knoten.has(id):
+		geraete_knoten[id].queue_free()
+		_geraet_zeichnen(id)
+		if ausgewaehlt == id:
+			_overlay(geraete_knoten[id], mat_auswahl_rahmen)
+
+## Geraete neu zeichnen, Auswahl bleibt
 func _geraete_neu_zeichnen() -> void:
 	for n in geraete_knoten.values(): n.queue_free()
 	geraete_knoten.clear()
@@ -1450,6 +1472,7 @@ func _leitung_zeichnen(l: Dictionary) -> void:
 		Modelle.rohrschelle(knoten, s, r, _senkrecht_bei(l.punkte, s))
 	_adern_zeichnen(knoten, l, "start", r)
 	_adern_zeichnen(knoten, l, "ende", r)
+	Modelle.zusammenfassen(knoten)
 	add_child(knoten)
 	leitung_knoten[l.id] = knoten
 
@@ -1479,7 +1502,7 @@ func _adern_zeichnen(knoten: Node3D, l: Dictionary, ende: String, r: float) -> v
 	var seite := dir.cross(Vector3(0, 0, 1)).normalized()
 	var feld := "abisoliert_von" if ende == "start" else "abisoliert_nach"
 	var n: int = l.adern.size()
-	var kupfer := _mat(Color(0.85, 0.5, 0.25), 0.3)
+	var kupfer := Modelle.mat(Color(0.85, 0.5, 0.25), 0.3, 0.5)
 	for i in range(n):
 		var a: Dictionary = l.adern[i]
 		var versatz := seite * (float(i) - (n - 1) / 2.0) * 0.006
@@ -1487,7 +1510,7 @@ func _adern_zeichnen(knoten: Node3D, l: Dictionary, ende: String, r: float) -> v
 		var bis := spitze - dir * 0.012 + versatz + Vector3(0, 0, r + 0.004)
 		var mi := MeshInstance3D.new()
 		mi.mesh = _rohr([von, bis], 0.0014)
-		mi.material_override = _mat(ADERFARBE.get(a.farbe, Color.BLACK), 0.5)
+		mi.material_override = Modelle.mat(ADERFARBE.get(a.farbe, Color.BLACK), 0.5)
 		knoten.add_child(mi)
 		var mm: float = a.get(feld, 0.0)
 		if mm > 0.0:

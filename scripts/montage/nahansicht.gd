@@ -244,7 +244,7 @@ func _klemme_einsetzen() -> void:
 	_c().geraet_hinzufuegen(kid, "klemme", _c().geraete[geraet].pos, {"dose": geraet})
 	gruppe.append(kid)
 	_hinweis.text = "Verbindungsklemme %s eingesetzt." % kid
-	montage.nahansicht_geaendert()
+	montage.dose_neu_zeichnen(geraet)
 	_aufbauen()
 
 func _bruecke_legen(k1: String, k2: String) -> void:

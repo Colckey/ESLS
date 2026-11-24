@@ -5,6 +5,9 @@ extends RefCounted
 ## in der Nahansicht anklemmen. Dient als Beispiel fuer Lehrer, fuer Screenshots und als Test
 ## fuer eine komplett fehlerfreie Montage.
 
+## Wird vom Lehrermodus gesetzt: Montage zeigt beim Start das fertige Beispielbrett
+static var beim_start := false
+
 const ZEILE := -0.33   # untere Geraetereihe (Unterputz-Hoehe am Brett)
 const KANAL_Y := 0.38
 
