@@ -33,8 +33,17 @@ func _ready() -> void:
 	c = aufbau(); c.geraete["ls1"].param.nennstrom = 20; r = _pruefe(c, 1)
 	_check("LS 20A an 1,5 mm2 -> Fehler (genau einmal gemeldet)", r, not r.ok and r.fehler.size() == 1)
 
+	c = aufbau(); c.leitungen[2].adern[0].farbe = "bu"; r = _pruefe(c, 1)
+	_check("Dieselbe Ader (blau) zweimal verwendet -> Fehler", r, r.fehler.any(func(f): return "mehrfach" in f))
+
+	c = aufbau(); c.leitungen[2].adern.append(c.leitungen[2].adern[0].duplicate()); r = _pruefe(c, 1)
+	_check("Mehr Adern als die Leitung hat -> Fehler", r, r.fehler.any(func(f): return "mehrfach" in f or "nur 3" in f))
+
+	_befestigung()
 	_schuetz_selbsthaltung()
 	_kreuzschaltung()
+	_aufgaben()
+	_treppenlicht()
 	_bewertung()
 	_speichern_laden()
 	ausgabe += "\n%s" % ("ALLE TESTS OK" if fehlgeschlagen == 0 else "%d TEST(S) FEHLGESCHLAGEN" % fehlgeschlagen)
@@ -134,6 +143,76 @@ func _kreuzschaltung() -> void:
 		an.append("lampe1" in c.pruefen().lampen_an)
 	var r := c.pruefen()
 	_check("Kreuzschaltung: jede Betätigung schaltet um %s" % [an], r, an[0] != an[1] and an[1] != an[2] and an[2] != an[3])
+
+## Kabelkanal und Verteiler halten die Leitung, gemessen wird entlang der Leitung
+func _befestigung() -> void:
+	var k := Circuit.KABELKANAL
+	var y := k.get_center().y
+	var c := aufbau()
+	# Leitung laeuft 60 cm im Kanal, faellt 20 cm senkrecht zum Geraet: 1 Schelle kurz vor dem Geraet reicht
+	var l: Dictionary = c.leitungen[3]
+	l.punkte = [Vector3(-0.3, y, 0), Vector3(0.3, y, 0), Vector3(0.3, k.position.y - 0.17, 0)]
+	l.schellen = [Vector3(0.3, k.position.y - 0.09, 0)]
+	var r := _pruefe(c, 1)
+	_check("Leitung im Kabelkanal braucht dort keine Schellen", r, not r.fehler.any(func(f): return "Schelle" in f or "befestigt" in f))
+	l.schellen = []
+	r = _pruefe(c, 1)
+	_check("Ohne Schelle am Fallrohr -> Fehler", r, r.fehler.any(func(f): return "Schelle" in f))
+	# 2 Schellen ueber Eck: Luftlinie 21 cm, entlang der Leitung 30 cm -> zu weit
+	l.punkte = [Vector3(0, 0, 0), Vector3(0.15, 0, 0), Vector3(0.15, 0.2, 0)]
+	l.schellen = [Vector3(0.0, 0, 0), Vector3(0.15, 0.15, 0)]
+	r = _pruefe(c, 1)
+	_check("Schellenabstand wird entlang der Leitung gemessen", r, r.fehler.any(func(f): return "Schellenabstand" in f))
+
+## Jede eingebaute Musterschaltung ist fehlerfrei und erreicht 100 Punkte
+func _aufgaben() -> void:
+	for a in Aufgaben.LISTE:
+		var m := Aufgaben.muster(a.id)
+		var b := Bewertung.bewerten(m, null, a.id)
+		_check("Aufgabe %s: Muster fehlerfrei, 100 Punkte %s" % [a.titel, b.anforderungen], {"ausgeloest": [], "lampen_an": [], "fehler": b.fehler},
+			b.punkte == 100 and b.funktion_ok == true and b.anforderungen.is_empty())
+	# Wechselschaltung: jede Betaetigung schaltet um
+	var w := Aufgaben.muster("wechselschaltung")
+	var an := []
+	for st in [[0, 0], [1, 0], [1, 1], [0, 1]]:
+		w.zustand["ws1"].stellung = st[0]
+		w.zustand["ws2"].stellung = st[1]
+		an.append("lampe1" in w.pruefen().lampen_an)
+	_check("Wechselschaltung: jede Betätigung schaltet um %s" % [an], {"ausgeloest": [], "lampen_an": [], "fehler": []},
+		an[0] != an[1] and an[1] != an[2] and an[2] != an[3])
+	# Falsch: korrespondierender Leiter auf L statt auf 2 -> Funktion weicht ab
+	var falsch := Aufgaben.muster("wechselschaltung")
+	falsch.leitungen[4].adern[1].nach = "ws2:L"
+	var b := Bewertung.bewerten(falsch, null, "wechselschaltung")
+	_check("Wechselschaltung falsch verdrahtet -> Funktion falsch", {"ausgeloest": [], "lampen_an": [], "fehler": b.fehler}, b.funktion_ok == false)
+	# Steckdosenkreis ohne FI: N vor dem FI -> FI loest aus bzw. Anforderung verletzt
+	var sd := Aufgaben.muster("steckdosenkreis")
+	sd.geraet_hinzufuegen("ls2", "ls", Vector3.ZERO, {"nennstrom": 16})
+	sd.leitungen[3].adern[0].von = "ls2:out"
+	Aufgaben._l(sd, "v9", "H07V-K 1,5", [["bn", "netz:L", "ls2:in"]])
+	sd.leitungen[3].adern[1].von = "netz:N"
+	b = Bewertung.bewerten(sd, null, "steckdosenkreis")
+	_check("Steckdosenkreis ohne FI -> Anforderung verletzt %s" % [b.anforderungen], {"ausgeloest": [], "lampen_an": [], "fehler": b.fehler},
+		b.anforderungen.any(func(f): return "FI" in f) and b.punkte < 100)
+	# Fehlende Bauteile
+	b = Bewertung.bewerten(aufbau(), null, "kreuzschaltung")
+	_check("Ausschaltung als Kreuzschaltung abgegeben -> fehlende Bauteile", {"ausgeloest": [], "lampen_an": [], "fehler": b.anforderungen},
+		b.anforderungen.size() >= 2 and b.funktion_ok == false)
+
+## Treppenlichtautomat: Taster einschalten, Licht bleibt bis die Zeit abgelaufen ist
+func _treppenlicht() -> void:
+	var c := Aufgaben.muster("treppenhaus")
+	var r := c.pruefen()
+	_check("Treppenlicht: aus ohne Tastendruck", r, r.lampen_an.is_empty())
+	c.zustand["t2"].stellung = 1
+	r = c.pruefen()
+	_check("Treppenlicht: Taster 2 gedrückt -> Licht an", r, "lampe1" in r.lampen_an)
+	c.zustand["t2"].stellung = 0
+	r = c.pruefen()
+	_check("Treppenlicht: losgelassen -> bleibt an (Nachlaufzeit)", r, "lampe1" in r.lampen_an)
+	c.zustand["tlz1"].an = false   # Zeit abgelaufen
+	r = c.pruefen()
+	_check("Treppenlicht: Zeit abgelaufen -> aus", r, r.lampen_an.is_empty())
 
 func _bewertung() -> void:
 	var muster := aufbau()

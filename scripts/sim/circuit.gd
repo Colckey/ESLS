@@ -17,6 +17,8 @@ const TYPEN := {
 	"taster_aus":  ["L", "1"],      # Oeffner, Stellung 1 = gedrueckt (dann offen)
 	"schuetz":     ["A1", "A2", "1", "2", "3", "4", "5", "6", "13", "14", "21", "22"],
 	"zeitrelais":  ["A1", "A2", "15", "16", "18"],
+	# Treppenlichtzeitschalter: Taster legen L auf T, dann schaltet L auf "Lampe" fuer die Nachlaufzeit
+	"treppenlicht": ["L", "N", "T", "Lampe"],
 	"lampe":       ["L", "N", "PE"],
 	"steckdose":   ["L", "N", "PE"],
 	"klemme":      ["a", "b", "c", "d", "e"],   # Verbindungsklemme: alle Klemmen leitend verbunden
@@ -32,6 +34,7 @@ const LEITUNGEN := {
 	"NYM-J 3x2,5": {"adern": ["bn", "bu", "gnye"], "qs": 2.5},
 	"NYM-J 5x2,5": {"adern": ["bn", "bk", "gy", "bu", "gnye"], "qs": 2.5},
 	"NYM-O 2x1,5": {"adern": ["bn", "bu"], "qs": 1.5},
+	"NYM-O 3x1,5": {"adern": ["bn", "bk", "gy"], "qs": 1.5},
 	"Steuerleitung 7x1,5": {"adern": ["1", "2", "3", "4", "5", "6", "gnye"], "qs": 1.5},
 	# Einzelader fuer die Verdrahtung im Verteiler (Bruecken), braucht keine Schellen
 	"H07V-K 1,5": {"adern": ["bn", "bk", "gy", "bu", "gnye"], "qs": 1.5, "einzelader": true},
@@ -42,6 +45,12 @@ const MAX_LS := {1.5: 16, 2.5: 20}
 const MAX_SCHELLENABSTAND := 0.25        # Meter
 const MAX_ENDABSTAND := 0.10             # erste/letzte Schelle hoechstens 10 cm vor Geraet/Dose
 const ABISOLIERLAENGE := Vector2(8, 12)  # mm, erlaubter Bereich
+
+## Feste Einbauten auf dem Uebungsbrett (Brettmitte = 0,0; Meter; y nach oben).
+## Im Kabelkanal und im Verteiler braucht eine Leitung keine Iso-Schellen.
+const KABELKANAL := Rect2(-0.58, 0.35, 1.16, 0.06)
+const VERTEILER_FELD := Rect2(-0.565, -0.015, 0.31, 0.315)
+const BEFESTIGT := [KABELKANAL, VERTEILER_FELD]
 
 var geraete := {}   # id -> {typ, pos, param:{}}
 var leitungen := []  # [{id, typ, punkte:[Vector3], schellen:[Vector3], abgemantelt:{start,ende}, adern:[{farbe, von, nach, abisoliert_von, abisoliert_nach}]}]
@@ -68,8 +77,8 @@ func geraet_hinzufuegen(id: String, typ: String, pos := Vector3.ZERO, param := {
 		zustand[id] = {"stellung": 0}
 	if typ in ["ls", "fi"]:
 		zustand[id] = {"ausgeloest": false}
-	if typ in ["schuetz", "zeitrelais"]:
-		zustand[id] = {"an": false}   # Spulenzustand bleibt erhalten (Selbsthaltung)
+	if typ in ["schuetz", "zeitrelais", "treppenlicht"]:
+		zustand[id] = {"an": false}   # Spulenzustand bleibt erhalten (Selbsthaltung, Nachlaufzeit)
 
 ## Tiefe Kopie (z. B. fuer die Bewertung, damit die Schuelerdatei unveraendert bleibt)
 func kopie() -> Circuit:
@@ -89,7 +98,8 @@ func _typ(klemme: String) -> String:
 # --- Pruefung ---------------------------------------------------------------
 ## Liefert {ok, ausgeloest:[ids], fehler:[texte], warnungen:[texte], lampen_an:[ids]}
 func pruefen() -> Dictionary:
-	var r := {"ok": true, "ausgeloest": [], "fehler": [], "warnungen": [], "lampen_an": [], "spulen_an": []}
+	var r := {"ok": true, "ausgeloest": [], "fehler": [], "warnungen": [], "lampen_an": [], "spulen_an": [],
+		"steckdosen_an": [], "ueber_fi": []}
 	_montage_pruefen(r)
 	_netz_pruefen(r)
 	r.ok = r.fehler.is_empty() and r.ausgeloest.is_empty()
@@ -98,25 +108,17 @@ func pruefen() -> Dictionary:
 func _montage_pruefen(r: Dictionary) -> void:
 	for l in leitungen:
 		var info: Dictionary = LEITUNGEN[l.typ]
-		# Schellenabstand entlang der Leitung
-		var pts: Array = l.get("schellen", [])
-		if info.get("einzelader", false):
-			pts = []   # keine Schellenpruefung
-		elif pts.size() < 2:
-			r.fehler.append("%s: Leitung ist nicht mit Iso-Schellen befestigt." % l.id)
-		for i in range(pts.size() - 1):
-			if (pts[i] as Vector3).distance_to(pts[i + 1]) > MAX_SCHELLENABSTAND + 0.001:
-				r.fehler.append("%s: Schellenabstand über %d cm." % [l.id, int(MAX_SCHELLENABSTAND * 100)])
-				break
-		var verlauf: Array = l.get("punkte", [])
-		if pts.size() >= 2 and verlauf.size() >= 2:
-			for ende in [verlauf[0], verlauf[verlauf.size() - 1]]:
-				var naechste := INF
-				for sp in pts:
-					naechste = minf(naechste, (sp as Vector3).distance_to(ende))
-				if naechste > MAX_ENDABSTAND + 0.001:
-					r.fehler.append("%s: Erste/letzte Iso-Schelle mehr als %d cm vom Gerät entfernt." % [l.id, int(MAX_ENDABSTAND * 100)])
-					break
+		if not info.get("einzelader", false):
+			_befestigung_pruefen(l, r)
+		# Jede Ader gibt es in der Leitung nur so oft, wie der Leitungstyp sie hat
+		var gezaehlt := {}
+		for a in l.adern:
+			gezaehlt[a.farbe] = gezaehlt.get(a.farbe, 0) + 1
+		for farbe in gezaehlt:
+			if gezaehlt[farbe] > info.adern.count(farbe) and farbe in info.adern:
+				r.fehler.append("%s: Ader %s ist mehrfach verwendet, %s hat nur %d davon." % [l.id, farbe, l.typ, info.adern.count(farbe)])
+		if l.adern.size() > info.adern.size():
+			r.fehler.append("%s: %d Adern verwendet, %s hat nur %d." % [l.id, l.adern.size(), l.typ, info.adern.size()])
 		var am: Dictionary = l.get("abgemantelt", {})
 		for a in l.adern:
 			if a.farbe not in info.adern:
@@ -156,6 +158,78 @@ func _montage_pruefen(r: Dictionary) -> void:
 						gemeldet[k.get_slice(":", 0)] = true
 						r.fehler.append("%s: %s mm² ist mit LS %dA nicht ausreichend abgesichert." % [l.id, str(info.qs), nenn])
 
+## Befestigung: Iso-Schellen, Kabelkanal und Verteiler halten die Leitung.
+## Gemessen wird entlang der Leitung (Laufmeter), nicht in Luftlinie.
+func _befestigung_pruefen(l: Dictionary, r: Dictionary) -> void:
+	var verlauf: Array = l.get("punkte", [])
+	var schellen: Array = l.get("schellen", [])
+	var gesamt := 0.0
+	for i in range(verlauf.size() - 1):
+		gesamt += (verlauf[i] as Vector3).distance_to(verlauf[i + 1])
+	# Befestigte Abschnitte als [von, bis] in Laufmetern
+	var halt := []
+	for sp in schellen:
+		var t := laufmeter(verlauf, sp)
+		halt.append([t, t])
+	var lauf := 0.0
+	for i in range(verlauf.size() - 1):
+		var a: Vector3 = verlauf[i]
+		var b: Vector3 = verlauf[i + 1]
+		var lg := a.distance_to(b)
+		for feld in BEFESTIGT:
+			var ab := _im_rechteck(Vector2(a.x, a.y), Vector2(b.x, b.y), feld)
+			if not ab.is_empty():
+				halt.append([lauf + ab[0] * lg, lauf + ab[1] * lg])
+		lauf += lg
+	if halt.is_empty():
+		r.fehler.append("%s: Leitung ist nicht mit Iso-Schellen befestigt." % l.id)
+		return
+	halt.sort_custom(func(x, y): return x[0] < y[0])
+	if halt[0][0] > MAX_ENDABSTAND + 0.001 or gesamt - _max_ende(halt) > MAX_ENDABSTAND + 0.001:
+		r.fehler.append("%s: Erste/letzte Iso-Schelle mehr als %d cm vom Gerät entfernt." % [l.id, int(MAX_ENDABSTAND * 100)])
+	var bis: float = halt[0][1]
+	for h in halt:
+		if h[0] - bis > MAX_SCHELLENABSTAND + 0.001:
+			r.fehler.append("%s: Schellenabstand über %d cm." % [l.id, int(MAX_SCHELLENABSTAND * 100)])
+			break
+		bis = maxf(bis, h[1])
+
+func _max_ende(halt: Array) -> float:
+	var m := 0.0
+	for h in halt: m = maxf(m, h[1])
+	return m
+
+## Anteil [t0, t1] (0..1) der Strecke a-b, der im Rechteck liegt, oder [] (Liang-Barsky)
+static func _im_rechteck(a: Vector2, b: Vector2, feld: Rect2) -> Array:
+	var t0 := 0.0
+	var t1 := 1.0
+	var d := b - a
+	for k in [[-d.x, a.x - feld.position.x], [d.x, feld.end.x - a.x], [-d.y, a.y - feld.position.y], [d.y, feld.end.y - a.y]]:
+		var p: float = k[0]
+		var q: float = k[1]
+		if absf(p) < 1e-9:
+			if q < 0: return []
+		else:
+			var t := q / p
+			if p < 0: t0 = maxf(t0, t)
+			else: t1 = minf(t1, t)
+	return [t0, t1] if t0 <= t1 else []
+
+## Laufmeter des Punkts p entlang des Verlaufs (naechster Punkt auf der Leitung)
+static func laufmeter(verlauf: Array, p: Vector3) -> float:
+	var lauf := 0.0
+	var best := INF
+	var best_lauf := 0.0
+	for i in range(verlauf.size() - 1):
+		var a: Vector3 = verlauf[i]
+		var b: Vector3 = verlauf[i + 1]
+		var q := Geometry3D.get_closest_point_to_segment(p, a, b)
+		if q.distance_to(p) < best:
+			best = q.distance_to(p)
+			best_lauf = lauf + a.distance_to(q)
+		lauf += a.distance_to(b)
+	return best_lauf
+
 ## Kontakte von Schuetz/Zeitrelais je nach Spulenzustand
 const SCHUETZ_SCHLIESSER := [["1", "2"], ["3", "4"], ["5", "6"], ["13", "14"]]
 const SCHUETZ_OEFFNER := [["21", "22"]]
@@ -188,6 +262,8 @@ func _verbinden(spulen: Dictionary) -> void:
 				# Ansprechverzoegert: nach Ablauf der Zeit schaltet 15 von 16 auf 18
 				var an: bool = spulen.get(id, false)
 				_union(id + ":15", id + (":18" if an else ":16"))
+			"treppenlicht":
+				if spulen.get(id, false): _union(id + ":L", id + ":Lampe")
 			"klemme", "pe_schiene", "n_schiene":
 				var ks: Array = TYPEN[g.typ]
 				for k in ks: _union(id + ":" + k, id + ":" + ks[0])
@@ -228,6 +304,7 @@ func _verbraucher() -> Array:
 		match geraete[id].typ:
 			"lampe", "steckdose": r.append([id, id + ":L", id + ":N"])
 			"schuetz", "zeitrelais": r.append([id, id + ":A1", id + ":A2"])
+			"treppenlicht": r.append([id, id + ":T", id + ":N"])
 	return r
 
 func _unter_spannung(q: Dictionary, a: String, b: String) -> bool:
@@ -246,15 +323,19 @@ func _netz_pruefen(r: Dictionary) -> void:
 	# Spulen schalten Kontakte, die wieder Spulen schalten: bis zum stabilen Zustand rechnen
 	var spulen := {}
 	for id in geraete:
-		if geraete[id].typ in ["schuetz", "zeitrelais"] and zustand.get(id, {}).get("an", false):
+		if geraete[id].typ in ["schuetz", "zeitrelais", "treppenlicht"] and zustand.get(id, {}).get("an", false):
 			spulen[id] = true
+	# Treppenlichtautomat merkt sich den Tastendruck bis die Nachlaufzeit abgelaufen ist
+	var gemerkt := {}
+	for id in spulen:
+		if geraete[id].typ == "treppenlicht": gemerkt[id] = true
 	var q := {}
 	for durchlauf in 12:
 		_verbinden(spulen)
 		q = _quellen(quelle)
-		var neu := {}
+		var neu := gemerkt.duplicate()
 		for v in _verbraucher():
-			if geraete[v[0]].typ in ["schuetz", "zeitrelais"] and _unter_spannung(q, v[1], v[2]):
+			if geraete[v[0]].typ in ["schuetz", "zeitrelais", "treppenlicht"] and _unter_spannung(q, v[1], v[2]):
 				neu[v[0]] = true
 		if neu == spulen:
 			break
@@ -262,7 +343,7 @@ func _netz_pruefen(r: Dictionary) -> void:
 		if durchlauf == 11:
 			r.warnungen.append("Steuerung schwingt (Schütz schaltet sich selbst ein und aus).")
 	for id in geraete:
-		if geraete[id].typ in ["schuetz", "zeitrelais"]:
+		if geraete[id].typ in ["schuetz", "zeitrelais", "treppenlicht"]:
 			zustand[id] = {"an": spulen.has(id)}
 	if q.warnung != "":
 		r.warnungen.append(q.warnung)
@@ -300,7 +381,10 @@ func _netz_pruefen(r: Dictionary) -> void:
 			if typ in ["lampe", "steckdose"] and ka in N and kb in L:
 				r.fehler.append("%s: L und N vertauscht." % id)
 			if typ == "lampe": r.lampen_an.append(id)
-			elif typ != "steckdose": r.spulen_an.append(id)
+			elif typ == "steckdose": r.steckdosen_an.append(id)
+			else: r.spulen_an.append(id)
+			if fi != "" and (ka == q.fi_L or kb == q.fi_L):
+				r.ueber_fi.append(id)
 
 func _ausloesen(r: Dictionary, knoten: String, grund: String) -> void:
 	var ls_ids := []
