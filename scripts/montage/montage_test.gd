@@ -55,13 +55,14 @@ func _ready() -> void:
 	var pfad := "user://montage_test.esim"
 	_check("Speichern", Projektdatei.speichern(m.circuit, pfad) == OK)
 	var d: Dictionary = Projektdatei.laden(pfad)
-	_check("Laden: gleiche Bauteile, Leitungen, Bohrungen", d.has("circuit") and d.circuit.geraete.size() == 3 \
+	_check("Laden: gleiche Bauteile, Leitungen, Bohrungen", d.has("circuit") and d.circuit.geraete.size() == 5 \
 		and d.circuit.leitungen.size() == 1 and d.circuit.bohrungen.size() == m.circuit.bohrungen.size())
 	# Seitenschneider
 	m._leitung_schneiden(Vector3(0.2, 0.2, 0))
 	_check("Seitenschneider entfernt Leitung", m.circuit.leitungen.is_empty())
 	m.queue_free()
 	_ausschaltung_komplett()
+	_musterbrett_fehlerfrei()
 	ausgabe += "\n%s" % ("ALLE TESTS OK" if fehlgeschlagen == 0 else "%d TEST(S) FEHLGESCHLAGEN" % fehlgeschlagen)
 	print(ausgabe)
 
@@ -73,14 +74,14 @@ func _check(name: String, ok: bool) -> void:
 func _ausschaltung_komplett() -> void:
 	var m: Node3D = load("res://montage.tscn").instantiate()
 	add_child(m)
-	var plaetze := {"fi": Vector3(-0.45, 0.1, 0), "ls": Vector3(-0.39, 0.1, 0), "abzweigdose": Vector3(0.0, 0.2, 0),
+	var plaetze := {"fi": Vector3(-0.50, 0.17, 0), "ls": Vector3(-0.45, 0.17, 0), "abzweigdose": Vector3(0.0, 0.2, 0),
 		"ausschalter": Vector3(0.0, -0.2, 0), "lampe": Vector3(0.4, 0.2, 0)}
 	for typ in plaetze:
 		var p: Vector3 = plaetze[typ]
 		m._bohren(p + Vector3(-0.005, -0.01, 0)); m._bohren(p + Vector3(0.005, 0.01, 0))
 		m.bauteil_typ = typ
 		m._bauteil_setzen(p)
-	_check("E2E: alle 5 Bauteile gesetzt", m.circuit.geraete.size() == 6)
+	_check("E2E: alle 5 Bauteile gesetzt", m.circuit.geraete.size() == 8)
 	m._werkzeug_waehlen(3)
 	for paar in [["ls", "abzweigdose"], ["abzweigdose", "ausschalter"], ["abzweigdose", "lampe"]]:
 		m._leitung_klick(plaetze[paar[0]])
@@ -135,4 +136,28 @@ func _ausschaltung_komplett() -> void:
 	r = m.circuit.pruefen()
 	_check("E2E: N der Zuleitung auf L-Klemme -> LS löst aus", "ls1" in r.ausgeloest)
 	m._pruefen()   # Anzeige darf nicht abstuerzen
+	m.queue_free()
+
+## Komplettes Uebungsbrett mit allen Werkzeugen: keine Fehler, keine Warnungen, 100 Punkte
+func _musterbrett_fehlerfrei() -> void:
+	var m: Node3D = load("res://montage.tscn").instantiate()
+	add_child(m)
+	Musterbrett.aufbauen(m)
+	var r: Dictionary = m.circuit.pruefen()
+	_check("Musterbrett: keine Fehler %s" % [r.fehler], r.fehler.is_empty() and r.ausgeloest.is_empty())
+	_check("Musterbrett: keine Warnungen %s" % [r.warnungen], r.warnungen.is_empty())
+	_check("Musterbrett: Leuchte und beide Steckdosen haben Spannung", "lampe1" in r.lampen_an and r.steckdosen_an.size() == 2)
+	var b := Bewertung.bewerten(m.circuit, null, "uebungsbrett")
+	_check("Musterbrett: 100 Punkte, Funktion wie Auftrag %s" % [b.anforderungen], b.punkte == 100 and b.funktion_ok == true)
+	m._pruefen()
+	var alle := true
+	for s in m.schritte():
+		if not s[1]: alle = false
+	_check("Musterbrett: alle Arbeitsschritte abgehakt", alle)
+	# Kreuzschaltung: jede Betaetigung schaltet die Leuchte um
+	var an := []
+	for sch in ["ws1", "x1", "ws2"]:
+		m.circuit.zustand[sch].stellung = 1 - int(m.circuit.zustand[sch].stellung)
+		an.append("lampe1" in m.circuit.pruefen().lampen_an)
+	_check("Musterbrett: jeder Schalter schaltet um %s" % [an], an == [false, true, false])
 	m.queue_free()

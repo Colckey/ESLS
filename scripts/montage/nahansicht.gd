@@ -5,7 +5,7 @@ extends PanelContainer
 ## Im Verteiler (Einspeisung, FI, LS) sieht man alle Verteilergeraete und kann
 ## Bruecken mit H07V-K-Einzeladern legen. In der Abzweigdose setzt man Verbindungsklemmen.
 
-const VERTEILER := ["einspeisung", "fi", "ls", "schuetz", "zeitrelais"]   # alles auf der Hutschiene
+const VERTEILER := ["einspeisung", "n_schiene", "pe_schiene", "fi", "ls", "schuetz", "zeitrelais", "treppenlicht"]   # alles auf der Hutschiene
 const FARBNAME := {"bn": "braun", "bu": "blau", "gnye": "grün-gelb", "bk": "schwarz", "gy": "grau"}
 const MAX_ADERN_SCHRAUBKLEMME := 2
 
@@ -68,7 +68,7 @@ func oeffnen(id: String) -> void:
 		for gid in _c().geraete:
 			if _c().geraete[gid].typ in VERTEILER:
 				gruppe.append(gid)
-		_titel.text = "Nahansicht: Verteiler (%s)" % ", ".join(gruppe)
+		_titel.text = "Nahansicht: Verteiler"
 	elif typ == "abzweigdose":
 		gruppe = [id]
 		for gid in _c().geraete:
@@ -139,7 +139,7 @@ func _aufbauen() -> void:
 				var mm: float = a.get("abisoliert_" + ende[1], 0.0)
 				b.text = "  %s  %s  ->  %s" % [FARBNAME.get(a.farbe, "Ader " + a.farbe), ("%d mm" % mm) if mm > 0 else "isoliert", ziel if ziel != "" else "frei"]
 				b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-				b.add_theme_color_override("font_color", montage.ADERFARBE.get(a.farbe, Color.WHITE).lightened(0.3))
+				b.add_theme_color_override("font_color", (montage.ADERFARBE.get(a.farbe, Stil.TEXT) as Color).darkened(0.25))
 				b.toggle_mode = true
 				b.button_pressed = auswahl.get("art", "") == "ader" and auswahl.leitung == l and auswahl.index == i and auswahl.feld == ende[1]
 				b.pressed.connect(_ader_gewaehlt.bind(l, i, ende[1]))
@@ -244,6 +244,7 @@ func _klemme_einsetzen() -> void:
 	_c().geraet_hinzufuegen(kid, "klemme", _c().geraete[geraet].pos, {"dose": geraet})
 	gruppe.append(kid)
 	_hinweis.text = "Verbindungsklemme %s eingesetzt." % kid
+	montage.nahansicht_geaendert()
 	_aufbauen()
 
 func _bruecke_legen(k1: String, k2: String) -> void:

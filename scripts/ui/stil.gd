@@ -1,16 +1,21 @@
 class_name Stil
 extends RefCounted
 ## Gemeinsames Aussehen der Oberflaeche (Montage, Nahansicht, Lehrermodus):
-## dunkle Panels, Akzentfarbe Orange, abgerundete Knoepfe.
+## helles, freundliches Lernprogramm: weisse Flaechen, Schulblau als Akzent,
+## Gruen fuer "geschafft", abgerundete Knoepfe, gut lesbare Schrift.
 
-const HINTERGRUND := Color(0.11, 0.12, 0.14, 0.97)
-const FLAECHE := Color(0.17, 0.18, 0.21)
-const FLAECHE_HELL := Color(0.23, 0.25, 0.29)
-const RAND := Color(0.27, 0.29, 0.33)
-const AKZENT := Color(0.98, 0.66, 0.16)
-const AKZENT_DUNKEL := Color(0.30, 0.22, 0.08)
-const TEXT := Color(0.92, 0.93, 0.95)
-const TEXT_LEISE := Color(0.62, 0.65, 0.70)
+const HINTERGRUND := Color(0.975, 0.977, 0.98, 0.98)
+const SEITE := Color(0.93, 0.94, 0.95)
+const FLAECHE := Color(1.0, 1.0, 1.0)
+const FLAECHE_HELL := Color(0.92, 0.95, 1.0)
+const RAND := Color(0.80, 0.83, 0.87)
+const AKZENT := Color(0.12, 0.42, 0.80)
+const AKZENT_DUNKEL := Color(0.86, 0.92, 1.0)
+const KOPF := Color(0.09, 0.33, 0.66)
+const GRUEN := Color(0.15, 0.58, 0.30)
+const GELB_PAPIER := Color(1.0, 0.98, 0.90)
+const TEXT := Color(0.13, 0.15, 0.19)
+const TEXT_LEISE := Color(0.40, 0.43, 0.48)
 
 static var _theme: Theme
 
@@ -41,23 +46,34 @@ static func theme() -> Theme:
 	t.set_stylebox("disabled", "Button", box(FLAECHE.darkened(0.3), 6))
 	t.set_stylebox("focus", "Button", StyleBoxEmpty.new())
 	t.set_color("font_color", "Button", TEXT)
-	t.set_color("font_hover_color", "Button", Color.WHITE)
-	t.set_color("font_pressed_color", "Button", AKZENT.lightened(0.3))
-	t.set_color("font_hover_pressed_color", "Button", AKZENT.lightened(0.4))
+	t.set_color("font_hover_color", "Button", AKZENT.darkened(0.2))
+	t.set_color("font_pressed_color", "Button", AKZENT.darkened(0.2))
+	t.set_color("font_hover_pressed_color", "Button", AKZENT.darkened(0.3))
 	t.set_color("font_focus_color", "Button", TEXT)
 
-	# Akzentknopf (z. B. "Prüfen")
+	# Akzentknopf (z. B. "Prüfen"): gruen
 	t.add_type("AkzentButton")
 	t.set_type_variation("AkzentButton", "Button")
-	t.set_stylebox("normal", "AkzentButton", box(AKZENT, 6, AKZENT, 0, Vector2(16, 6)))
-	t.set_stylebox("hover", "AkzentButton", box(AKZENT.lightened(0.15), 6, AKZENT, 0, Vector2(16, 6)))
-	t.set_stylebox("pressed", "AkzentButton", box(AKZENT.darkened(0.15), 6, AKZENT, 0, Vector2(16, 6)))
+	t.set_stylebox("normal", "AkzentButton", box(GRUEN, 6, GRUEN, 0, Vector2(18, 6)))
+	t.set_stylebox("hover", "AkzentButton", box(GRUEN.lightened(0.12), 6, GRUEN, 0, Vector2(18, 6)))
+	t.set_stylebox("pressed", "AkzentButton", box(GRUEN.darkened(0.15), 6, GRUEN, 0, Vector2(18, 6)))
 	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		t.set_color(c, "AkzentButton", Color(0.1, 0.08, 0.05))
+		t.set_color(c, "AkzentButton", Color.WHITE)
+	# Knoepfe in der blauen Kopfleiste
+	t.add_type("KopfButton")
+	t.set_type_variation("KopfButton", "Button")
+	t.set_stylebox("normal", "KopfButton", box(Color(1, 1, 1, 0.12), 6, Color(1, 1, 1, 0.25), 1))
+	t.set_stylebox("hover", "KopfButton", box(Color(1, 1, 1, 0.22), 6, Color(1, 1, 1, 0.4), 1))
+	t.set_stylebox("pressed", "KopfButton", box(Color(1, 1, 1, 0.3), 6, Color(1, 1, 1, 0.5), 1))
+	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		t.set_color(c, "KopfButton", Color.WHITE)
+	t.add_type("KopfLabel")
+	t.set_type_variation("KopfLabel", "Label")
+	t.set_color("font_color", "KopfLabel", Color.WHITE)
 
 	# Eingabefelder
-	t.set_stylebox("normal", "LineEdit", box(Color(0.08, 0.09, 0.10), 6, RAND, 1))
-	t.set_stylebox("focus", "LineEdit", box(Color(0.08, 0.09, 0.10), 6, AKZENT, 1))
+	t.set_stylebox("normal", "LineEdit", box(Color.WHITE, 6, RAND, 1))
+	t.set_stylebox("focus", "LineEdit", box(Color.WHITE, 6, AKZENT, 2))
 	t.set_color("font_color", "LineEdit", TEXT)
 	t.set_color("font_placeholder_color", "LineEdit", TEXT_LEISE)
 	t.set_color("caret_color", "LineEdit", AKZENT)
@@ -66,7 +82,26 @@ static func theme() -> Theme:
 	t.set_stylebox("panel", "PanelContainer", box(HINTERGRUND, 0, RAND, 0, Vector2(12, 10)))
 	t.add_type("Karte")
 	t.set_type_variation("Karte", "PanelContainer")
-	t.set_stylebox("panel", "Karte", box(HINTERGRUND, 10, RAND, 1, Vector2(14, 12)))
+	var karte := box(Color.WHITE, 10, RAND, 1, Vector2(16, 14))
+	karte.shadow_color = Color(0, 0, 0, 0.12)
+	karte.shadow_size = 8
+	t.set_stylebox("panel", "Karte", karte)
+	t.add_type("Papier")
+	t.set_type_variation("Papier", "PanelContainer")
+	t.set_stylebox("panel", "Papier", box(GELB_PAPIER, 0, Color(0.9, 0.85, 0.65), 1, Vector2(14, 6)))
+	# Optionsliste, Tooltip
+	t.set_stylebox("normal", "OptionButton", box(Color.WHITE, 6, RAND, 1))
+	t.set_stylebox("hover", "OptionButton", box(FLAECHE_HELL, 6, AKZENT, 1))
+	t.set_stylebox("pressed", "OptionButton", box(FLAECHE_HELL, 6, AKZENT, 1))
+	t.set_color("font_color", "OptionButton", TEXT)
+	t.set_color("font_hover_color", "OptionButton", TEXT)
+	t.set_stylebox("panel", "PopupMenu", box(Color.WHITE, 6, RAND, 1, Vector2(6, 6)))
+	t.set_color("font_color", "PopupMenu", TEXT)
+	t.set_color("font_hover_color", "PopupMenu", AKZENT)
+	t.set_stylebox("hover", "PopupMenu", box(FLAECHE_HELL, 4))
+	t.set_stylebox("panel", "TooltipPanel", box(Color(0.15, 0.17, 0.22, 0.96), 6, Color(), 0, Vector2(10, 8)))
+	t.set_color("font_color", "TooltipLabel", Color.WHITE)
+	t.set_stylebox("normal", "SpinBox", box(Color.WHITE, 6, RAND, 1))
 
 	# Texte
 	t.set_color("font_color", "Label", TEXT)

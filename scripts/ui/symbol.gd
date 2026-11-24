@@ -33,6 +33,10 @@ func _draw() -> void:
 			_gehaeuse(m, Vector2(26, 38))
 			draw_rect(Rect2(m + Vector2(-8, -10), Vector2(16, 12)), LINIE, false, 1.5)
 			_text(f, m + Vector2(0, 13), "K", 11)
+		"treppenlicht":
+			_gehaeuse(m, Vector2(14, 38))
+			draw_circle(m + Vector2(0, -10), 2.5, Color(0.3, 0.8, 0.35))
+			_text(f, m + Vector2(0, 6), "T", 11)
 		"zeitrelais":
 			_gehaeuse(m, Vector2(14, 38))
 			draw_arc(m + Vector2(0, -5), 5, 0, TAU, 20, LINIE, 1.5)

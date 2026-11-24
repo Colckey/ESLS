@@ -54,6 +54,15 @@ const LISTE := [
 		"lernziele": ["Steuerstromkreis und Hauptstromkreis trennen", "Selbsthaltung über Hilfskontakt 13/14", "Öffner vor Schließer in Reihe"],
 		"tipps": ["Spule A1/A2: A2 an N", "13/14 parallel zum Ein-Taster", "Hauptkontakt 1/2 schaltet die Lampe"],
 	},
+	{
+		"id": "uebungsbrett", "titel": "Übungsbrett komplett", "lehrjahr": 1, "stufe": "Abschluss",
+		"kurz": "Kreuzschaltung und Steckdosenkreis auf einem Brett.",
+		"auftrag": "Baue das komplette Übungsbrett wie in der Werkstatt: Die Leuchte wird über eine Abzweigdose von drei Stellen geschaltet (Wechsel-, Kreuz-, Wechselschalter, LS 1). Zwei Steckdosen bekommen einen eigenen LS (LS 2). Beide Stromkreise laufen über den FI. Die Leitungen führen durch den Kabelkanal oben.",
+		"bauteile": {"fi": 1, "ls": 2, "abzweigdose": 1, "wechselschalter": 2, "kreuzschalter": 1, "lampe": 1, "steckdose": 2},
+		"ueber_fi": ["steckdose"],
+		"lernziele": ["Mehrere Stromkreise im Verteiler aufteilen", "N- und PE-Klemmen im Verteiler nutzen", "Leitungen sauber im Kabelkanal führen"],
+		"tipps": ["Im Kabelkanal und im Verteiler braucht die Leitung keine Iso-Schellen", "Schutzleiter in der Abzweigdose durchverbinden", "Erst den Verteiler verdrahten, dann die Dose"],
+	},
 ]
 
 const TYP_NAME := {"fi": "FI-Schalter", "ls": "LS-Schalter", "abzweigdose": "Abzweigdose", "ausschalter": "Ausschalter",
@@ -99,6 +108,7 @@ static func muster(id: String) -> Circuit:
 		"steckdosenkreis": return _steckdosenkreis()
 		"treppenhaus": return _treppenhaus()
 		"schuetz": return _schuetz()
+		"uebungsbrett": return _uebungsbrett()
 	return null
 
 ## Einspeisung, FI und LS sind in allen Mustern gleich
@@ -162,4 +172,15 @@ static func _schuetz() -> Circuit:
 		["4", "s1:1", "k1:A1"], ["5", "k1:14", "k1:A1"]])
 	_l(c, "v4", "H07V-K 1,5", [["bu", "k1:A2", "fi1:N_out"]])
 	_l(c, "w", "NYM-J 5x1,5", [["bk", "ls1:out", "k1:1"], ["bn", "k1:2", "lampe1:L"], ["bu", "fi1:N_out", "lampe1:N"], ["gnye", "netz:PE", "lampe1:PE"]])
+	return c
+
+static func _uebungsbrett() -> Circuit:
+	var c := _kreuzschaltung()
+	c.geraet_hinzufuegen("dose1", "abzweigdose")
+	c.geraet_hinzufuegen("ls2", "ls", Vector3.ZERO, {"nennstrom": 16})
+	c.geraet_hinzufuegen("sd1", "steckdose")
+	c.geraet_hinzufuegen("sd2", "steckdose")
+	_l(c, "v4", "H07V-K 1,5", [["bn", "ls1:in", "ls2:in"]])
+	_l(c, "w5", "NYM-J 3x2,5", [["bn", "ls2:out", "sd1:L"], ["bu", "fi1:N_out", "sd1:N"], ["gnye", "netz:PE", "sd1:PE"]])
+	_l(c, "w6", "NYM-J 3x2,5", [["bn", "sd1:L", "sd2:L"], ["bu", "sd1:N", "sd2:N"], ["gnye", "sd1:PE", "sd2:PE"]])
 	return c
