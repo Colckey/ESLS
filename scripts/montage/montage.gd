@@ -58,7 +58,7 @@ const WERKZEUG_GRUPPEN := [
 	["Vorbereiten", [[Werkzeug.AUSWAHL, "Auswahl", "1"], [Werkzeug.BOHRER, "Bohrmaschine", "2"]]],
 	["Verlegen", [[Werkzeug.LEITUNG, "Leitung verlegen", "3"], [Werkzeug.SCHELLE, "Iso-Schelle", "4"],
 		[Werkzeug.SEITENSCHNEIDER, "Seitenschneider", "5"]]],
-	["Anschließen", [[Werkzeug.ABMANTELN, "Abmantelungswerkzeug", "6"], [Werkzeug.ABISOLIEREN, "Abisolierzange", "7"],
+	["Anschließen", [[Werkzeug.ABMANTELN, "Abmantelwerkzeug", "6"], [Werkzeug.ABISOLIEREN, "Abisolierzange", "7"],
 		[Werkzeug.ANKLEMMEN, "Schraubendreher", "8"]]],
 	["Messen", [[Werkzeug.ZOLLSTOCK, "Zollstock (messen)", "9"], [Werkzeug.WASSERWAAGE, "Wasserwaage", "0"]]],
 ]
@@ -590,6 +590,19 @@ func _aufgaben_karte(a: Dictionary, nr: int) -> Control:
 	kurz.custom_minimum_size = Vector2(260, 0)
 	kurz.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(kurz)
+	var teile := HBoxContainer.new()
+	teile.add_theme_constant_override("separation", 2)
+	v.add_child(teile)
+	for typ in a.bauteile:
+		var bild := grafik("bauteile/%s" % typ)
+		if bild == null: continue
+		var tr := TextureRect.new()
+		tr.texture = bild
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.custom_minimum_size = Vector2(30, 30)
+		tr.tooltip_text = "%d× %s" % [a.bauteile[typ], Aufgaben.TYP_NAME.get(typ, typ)]
+		teile.add_child(tr)
 	var los := _knopf("Auftrag starten", aufgabe_starten.bind(a.id))
 	los.theme_type_variation = "AkzentButton"
 	los.size_flags_horizontal = Control.SIZE_SHRINK_END
@@ -649,7 +662,7 @@ func _bauteil_kachel(typ: String) -> Button:
 	var b := Button.new()
 	b.toggle_mode = true
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(102, 66)
+	b.custom_minimum_size = Vector2(102, 78)
 	b.tooltip_text = "%s\n%s" % [BAUTEILE[typ].name, ERKLAERUNG.get(typ, "")]
 	b.pressed.connect(func() -> void:
 		bauteil_typ = typ
@@ -661,11 +674,22 @@ func _bauteil_kachel(typ: String) -> Button:
 	v.add_theme_constant_override("separation", 0)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(v)
-	var sym := BauteilSymbol.new()
-	sym.typ = typ
-	sym.farbe = BAUTEILE[typ].farbe
-	sym.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	v.add_child(sym)
+	var bild := grafik("bauteile/%s" % typ)
+	if bild:
+		var tr := TextureRect.new()
+		tr.texture = bild
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.custom_minimum_size = Vector2(80, 52)
+		tr.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(tr)
+	else:
+		var sym := BauteilSymbol.new()
+		sym.typ = typ
+		sym.farbe = BAUTEILE[typ].farbe
+		sym.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		v.add_child(sym)
 	var l := Label.new()
 	l.text = KACHEL_NAME.get(typ, BAUTEILE[typ].name)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -699,8 +723,11 @@ func _werkzeug_panel() -> Control:
 				var lt := OptionButton.new()
 				lt.focus_mode = Control.FOCUS_NONE
 				var namen: Array = Circuit.LEITUNGEN.keys()
+				lt.add_theme_constant_override("icon_max_width", 26)
 				for n in namen:
-					lt.add_item(n)
+					var ico := grafik("leitungen/%s" % leitung_datei(n))
+					if ico: lt.add_icon_item(ico, n)
+					else: lt.add_item(n)
 				lt.tooltip_text = "Leitungstyp"
 				lt.item_selected.connect(func(i: int) -> void:
 					leitung_typ = namen[i]
@@ -757,6 +784,18 @@ func _einrueckung(c: Control) -> Control:
 	rand.add_child(c)
 	return rand
 
+## Eigene Bilder (aus den 3D-Modellen erzeugt mit tools/grafiken.gd)
+const WERKZEUG_BILD := {Werkzeug.AUSWAHL: "auswahl", Werkzeug.BOHRER: "bohrer", Werkzeug.SCHELLE: "schelle",
+	Werkzeug.SEITENSCHNEIDER: "seitenschneider", Werkzeug.ABMANTELN: "abmanteln", Werkzeug.ABISOLIEREN: "abisolieren",
+	Werkzeug.ANKLEMMEN: "anklemmen", Werkzeug.ZOLLSTOCK: "zollstock", Werkzeug.WASSERWAAGE: "wasserwaage"}
+
+static func grafik(name: String) -> Texture2D:
+	var pfad := "res://grafik/%s.png" % name
+	return load(pfad) if ResourceLoader.exists(pfad) else null
+
+static func leitung_datei(typ: String) -> String:
+	return typ.to_lower().replace(" ", "_").replace(",", "_").replace("-", "_")
+
 func _werkzeug_knopf(w: int, text: String, taste: String) -> Button:
 	var b := Button.new()
 	b.toggle_mode = true
@@ -765,6 +804,13 @@ func _werkzeug_knopf(w: int, text: String, taste: String) -> Button:
 	b.text = text
 	b.add_theme_font_size_override("font_size", 14)
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.custom_minimum_size = Vector2(0, 36)
+	var ico := grafik("werkzeuge/%s" % WERKZEUG_BILD.get(w, ""))
+	if w == Werkzeug.LEITUNG:
+		ico = grafik("leitungen/nym_j_3x1_5")
+	if ico:
+		b.icon = ico
+		b.add_theme_constant_override("icon_max_width", 28)
 	b.tooltip_text = "%s (Taste %s)" % [text, taste]
 	b.pressed.connect(_werkzeug_waehlen.bind(w))
 	var k := Label.new()

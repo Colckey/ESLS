@@ -70,6 +70,20 @@ Beim Prüfen leuchtet die Leuchte, Wippen zeigen die Schalterstellung, ein ausge
 
 ![Prüfergebnis](docs/pruefergebnis.png)
 
+## Grafiken
+![Alle Grafiken](docs/grafiken.png)
+
+Alle Bilder für Bauteile, Werkzeuge und Leitungen sind **selbst erstellt**: Sie werden aus den eigenen 3D-Modellen des Programms
+gerendert (`scripts/montage/werkzeugmodelle.gd` für Werkzeuge und Leitungen, `modelle.gd` für die Geräte).
+Neu erzeugen nach einer Modelländerung:
+```
+godot --rendering-driver opengl3 --path . -s tools/grafiken.gd
+```
+Die Bilder landen in `grafik/` und erscheinen in den Bauteil-Kacheln, der Werkzeugleiste, der Leitungsauswahl,
+der 3D-Anschlussansicht und auf den Auftragskarten.
+
+![Werkzeugleiste](docs/werkzeugleiste.png)
+
 ## Lehrermodus
 ![Lehrermodus](docs/lehrermodus.png)
 

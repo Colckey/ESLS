@@ -70,6 +70,10 @@ func _ready() -> void:
 		b.toggle_mode = true
 		b.focus_mode = Control.FOCUS_NONE
 		b.pressed.connect(modus_setzen.bind(m[0]))
+		var ico := _ico(m[0])
+		if ico:
+			b.icon = ico
+			b.add_theme_constant_override("icon_max_width", 24)
 		schritte.add_child(b)
 		_modus_knoepfe[m[0]] = b
 	var mm := SpinBox.new()
@@ -394,3 +398,7 @@ func _bruecke_entfernen(l: Dictionary) -> void:
 	montage._alles_neu_zeichnen()
 	show()
 	_aufbauen()
+
+func _ico(m: int) -> Texture2D:
+	var pfad := "res://grafik/werkzeuge/%s.png" % ["abmanteln", "abisolieren", "anklemmen"][m]
+	return load(pfad) if ResourceLoader.exists(pfad) else null

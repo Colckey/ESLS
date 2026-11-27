@@ -41,3 +41,4 @@ Bitte kurz durchsehen. Alles lässt sich leicht ändern.
 | 35 | Abmanteln geht erst, wenn die Leitung höchstens 10 cm vor dem Gerät befestigt ist (Schelle, Kanal oder Verteiler) | Gibt den Schellen einen Sinn und erzwingt die Reihenfolge verlegen → befestigen → abmanteln | Nur beim Prüfen bemängeln |
 | 36 | Auf dem Brett endet der Mantel 3 cm vor dem Geräterand, die Adern sind in ihren Farben sichtbar | Man sieht sofort, welche Enden schon abgemantelt sind | Mantel bis ins Gerät |
 | 37 | Zollstock, Wasserwaage, cm-Raster (R) und Bauplan (B) mit den Maßen aus dem Foto | Brett soll genau wie auf dem Bild gebaut werden können | Freie Maßlinien |
+| 38 | Bilder für Bauteile, Werkzeuge und Leitungen werden aus den eigenen 3D-Modellen gerendert (`tools/grafiken.gd`), keine fremden Grafiken | Keine Lizenzprobleme, Bild und 3D-Modell sehen gleich aus | Handgezeichnete Symbole (vorher) |
