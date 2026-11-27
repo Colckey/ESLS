@@ -87,7 +87,44 @@ static func werkzeug(name: String) -> Node3D:
 		"anklemmen": _schraubendreher(n)
 		"zollstock": _zollstock(n)
 		"wasserwaage": _wasserwaage(n)
+		"crimpen": _crimpzange(n)
+		"bruecke": _bruecke(n)
+		"phasenschiene": _phasenschiene(n)
 	return n
+
+static func _crimpzange(n: Node3D) -> void:
+	var dreh := Vector3(0.02, 0.02, 0)
+	for s in [-1.0, 1.0]:
+		var ende := Vector3(-0.075, -0.075, 0) + Vector3(-s, s, 0) * 0.03
+		stab(n, dreh + Vector3(-0.012, -0.012, 0), ende, 0.009, m(GELB, 0.6), 0.011)
+		stab(n, ende + (dreh - ende).normalized() * 0.035, ende, 0.0115, m(SCHWARZ, 0.7))
+		kugel(n, 0.011, ende, m(SCHWARZ, 0.7))
+	# Crimpbacken mit Sechskant-Gesenk
+	var g := Node3D.new()
+	g.position = dreh + Vector3(0.028, 0.028, 0)
+	g.rotation.z = PI / 4
+	n.add_child(g)
+	Modelle.box(g, Vector3(0.05, 0.034, 0.012), Vector3.ZERO, m(Color(0.32, 0.34, 0.37), 0.35, 0.7))
+	Modelle.zyl(g, 0.006, 0.014, Vector3(0.004, 0, 0), m(SCHWARZ), 6)
+	Modelle.zyl(n, 0.009, 0.02, dreh, m(STAHL, 0.3, 0.8), 14)
+	# Aderendhuelse (rot) im Gesenk
+	stab(n, g.position + Vector3(-0.004, 0.012, 0.008), g.position + Vector3(0.012, 0.028, 0.008), 0.0045, m(Color(0.85, 0.1, 0.1), 0.45))
+
+static func _bruecke(n: Node3D) -> void:
+	var braun := m(Color(0.45, 0.25, 0.12), 0.5)
+	var pts := [Vector3(-0.07, -0.04, 0), Vector3(-0.06, 0.02, 0), Vector3(-0.02, 0.05, 0), Vector3(0.02, 0.05, 0), Vector3(0.06, 0.02, 0), Vector3(0.07, -0.04, 0)]
+	for i in range(pts.size() - 1):
+		stab(n, pts[i], pts[i + 1], 0.0045, braun)
+		kugel(n, 0.0045, pts[i + 1], braun)
+	for p in [pts[0], pts[-1]]:
+		stab(n, p, p + Vector3(0, -0.012, 0), 0.0065, m(Color(0.85, 0.1, 0.1), 0.45))
+		stab(n, p + Vector3(0, -0.012, 0), p + Vector3(0, -0.032, 0), 0.0045, m(Color(0.82, 0.83, 0.86), 0.25, 0.8))
+
+static func _phasenschiene(n: Node3D) -> void:
+	Modelle.box(n, Vector3(0.2, 0.026, 0.012), Vector3(0, 0.01, 0), m(Color(0.93, 0.93, 0.9), 0.5))
+	Modelle.box(n, Vector3(0.2, 0.008, 0.013), Vector3(0, 0.016, 0), m(Color(0.86, 0.55, 0.3), 0.3, 0.7))
+	for i in 6:
+		Modelle.box(n, Vector3(0.008, 0.03, 0.004), Vector3(-0.085 + i * 0.034, -0.015, 0), m(Color(0.86, 0.55, 0.3), 0.3, 0.7))
 
 static func _auswahl(n: Node3D) -> void:
 	var pfeil := PackedVector2Array([Vector2(0, 0), Vector2(0, -0.16), Vector2(0.036, -0.124), Vector2(0.062, -0.18),

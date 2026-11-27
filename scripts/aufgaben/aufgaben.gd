@@ -138,7 +138,8 @@ static func _verteiler(geraete: Array) -> Circuit:
 static func _l(c: Circuit, id: String, typ: String, adern: Array) -> void:
 	var a := []
 	for x in adern:
-		a.append({"farbe": x[0], "von": x[1], "nach": x[2], "abisoliert_von": 10.0, "abisoliert_nach": 10.0})
+		a.append({"farbe": x[0], "von": x[1], "nach": x[2], "abisoliert_von": 10.0, "abisoliert_nach": 10.0,
+			"huelse_von": true, "huelse_nach": true})
 	var s := [Vector3(0, 0, 0), Vector3(0.2, 0, 0)]
 	c.leitung_hinzufuegen({"id": id, "typ": typ, "punkte": s, "schellen": s,
 		"abgemantelt": {"start": true, "ende": true}, "adern": a})

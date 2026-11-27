@@ -113,6 +113,12 @@ func _ausschaltung_komplett() -> void:
 	for b in [["bn", "netz:L", "fi1:L_in"], ["bu", "netz:N", "fi1:N_in"], ["bn", "fi1:L_out", "ls1:in"]]:
 		n.bruecken_farbe = b[0]
 		n._bruecke_legen(b[1], b[2])
+	var r0: Dictionary = m.circuit.pruefen()
+	var ohne_huelse := false
+	for f in r0.fehler:
+		if "Aderendhülse" in f: ohne_huelse = true
+	_check("E2E: Brücke ohne Aderendhülse wird bemängelt", ohne_huelse)
+	Musterbrett.alle_crimpen(n)
 	var w1: Dictionary = m.circuit.leitungen[0]   # ls1 -> dose1
 	var w2: Dictionary = m.circuit.leitungen[1]   # dose1 -> s1
 	var w3: Dictionary = m.circuit.leitungen[2]   # dose1 -> lampe1
@@ -148,6 +154,7 @@ func _ausschaltung_komplett() -> void:
 	m._pruefen()   # Anzeige darf nicht abstuerzen
 	m.queue_free()
 	_werkzeuge_3d()
+	_tutorial_vormachen()
 
 ## Komplettes Uebungsbrett mit allen Werkzeugen: keine Fehler, keine Warnungen, 100 Punkte
 func _musterbrett_fehlerfrei() -> void:
@@ -221,4 +228,30 @@ func _werkzeuge_3d() -> void:
 	m.aufgabe_starten("uebungsbrett")
 	m.bauplan_umschalten()
 	_check("Bauplan zeigt die Umrisse", m.bauplan_an and m.bauplan_knoten.get_child_count() > 10)
+	m.queue_free()
+
+## Tutorial: jeder Schritt laesst sich vormachen und ist danach erledigt; am Ende hat die Steckdose Spannung
+func _tutorial_vormachen() -> void:
+	var m: Node3D = load("res://montage.tscn").instantiate()
+	add_child(m)
+	m.tutorial_starten()
+	var t: Tutorial = m.tutorial
+	var alle := true
+	var fehlend := []
+	for i in t.anzahl():
+		t.schritt_zeigen(i)
+		if t.erledigt():
+			alle = false
+			fehlend.append("%d schon vorher erledigt" % (i + 1))
+		t.vormachen_jetzt()
+		if not t.erledigt():
+			alle = false
+			fehlend.append(i + 1)
+	_check("Tutorial: alle %d Schritte vormachbar %s" % [t.anzahl(), fehlend], alle)
+	var r: Dictionary = m.circuit.pruefen()
+	_check("Tutorial: Steckdose hat Spannung, keine Fehler %s %s" % [r.fehler, r.warnungen], r.fehler.is_empty() and r.steckdosen_an.size() == 1)
+	var schiene := false
+	for l in m.circuit.leitungen:
+		if Circuit.LEITUNGEN[l.typ].get("schiene", false): schiene = true
+	_check("Tutorial: Phasenschiene gesteckt", schiene)
 	m.queue_free()

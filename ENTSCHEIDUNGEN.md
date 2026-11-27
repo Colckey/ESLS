@@ -42,3 +42,7 @@ Bitte kurz durchsehen. Alles lässt sich leicht ändern.
 | 36 | Auf dem Brett endet der Mantel 3 cm vor dem Geräterand, die Adern sind in ihren Farben sichtbar | Man sieht sofort, welche Enden schon abgemantelt sind | Mantel bis ins Gerät |
 | 37 | Zollstock, Wasserwaage, cm-Raster (R) und Bauplan (B) mit den Maßen aus dem Foto | Brett soll genau wie auf dem Bild gebaut werden können | Freie Maßlinien |
 | 38 | Bilder für Bauteile, Werkzeuge und Leitungen werden aus den eigenen 3D-Modellen gerendert (`tools/grafiken.gd`), keine fremden Grafiken | Keine Lizenzprobleme, Bild und 3D-Modell sehen gleich aus | Handgezeichnete Symbole (vorher) |
+| 39 | Brücken im Verteiler nur mit H07V-K; jedes Ende braucht eine gecrimpte Aderendhülse, sonst Fehler beim Prüfen | Feindrähtige Leiter ohne Hülse sind in der Praxis ein Mangel | Nur Warnung |
+| 40 | Phasenschiene 1-polig (FI L_out → alle LS-Eingänge) per Knopf; zählt nicht als Ader in der Klemme | Wie im Hager-Verteiler aus der Werkstatt, schnell und ohne Brückenwirrwarr | Mehrpolige Schiene (später, mit 3-phasigen LS) |
+| 41 | Zuleitung vom CEE-Stecker ist fest an L/N/PE der Hauptklemme angeschlossen (sichtbar auf dem Brett und in 3D) | Ist am Schulbrett vormontiert | Zuleitung selbst anschließen |
+| 42 | Tutorial mit 14 Schritten am Steckdosenkreis, jeder Schritt hakt sich selbst ab, „Vormachen“ erledigt ihn | Einstieg ohne Lehrer, man sieht jeden Handgriff | Video |

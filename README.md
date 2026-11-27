@@ -7,6 +7,14 @@ mit auslösendem LS/FI. Godot 4.7, Kompatibilitäts-Renderer (läuft auf schwach
 ## Starten
 Godot 4.7 öffnen → Projekt importieren → `project.godot` → **F5** (Hauptszene `montage.tscn`).
 
+## Tutorial (zum Einstieg)
+![Tutorial](docs/tutorial.png)
+
+Auf dem Startbildschirm **„▶ Tutorial“** wählen. In 14 Schritten wird eine Steckdose angeschlossen, vom Verteiler bis zum Prüfen:
+FI und LS setzen, Einspeisung mit H07V-K auf den FI, **Phasenschiene** aufstecken, N und PE auf die Klemmen,
+**Aderendhülsen crimpen**, bohren, Steckdose setzen, NYM-J 3x2,5 verlegen, Iso-Schellen, abmanteln, abisolieren, anklemmen, prüfen.
+Jeder Schritt hakt sich von selbst ab. **„▶ Vormachen“** erledigt den Schritt, damit man sieht, wie es geht.
+
 ## Startbildschirm und Aufträge
 ![Startbildschirm](docs/startbildschirm.png)
 
@@ -49,7 +57,9 @@ Beim Prüfen leuchtet die Leuchte, Wippen zeigen die Schalterstellung, ein ausge
 6. **Abisolierzange** (Länge rechts einstellen, richtig sind 8–12 mm): in der 3D-Ansicht **jede Ader einzeln** anklicken, das blanke Kupfer wird sichtbar
 7. **Schraubendreher**: in der 3D-Ansicht erst die Ader, dann die Klemme anklicken. Die Ader läuft dann sichtbar in die Klemme.
    Rechte Maustaste dreht die Ansicht, Mausrad zoomt. „Liste“ zeigt statt 3D die alte Listenansicht
-   - Verteiler: Brücken mit H07V-K legen (zwei Klemmen nacheinander), N- und PE-Klemmen nutzen
+   - Verteiler: **④ Brücke H07V-K** (Farbe wählen, zwei Klemmen nacheinander anklicken), **⑤ Aderendhülse crimpen**
+     (jedes Brückenende mit gelbem Punkt anklicken), **Phasenschiene aufstecken** (FI L_out → alle LS), N- und PE-Klemmen nutzen.
+     Die Zuleitung vom CEE-Stecker ist an der Hauptklemme L/N/PE fest angeschlossen
    - Abzweigdose: Verbindungsklemmen einsetzen
 8. **✔ Prüfen** (Taste P): Fehler, Warnungen und **Selbstkontrolle gegen den Auftrag** mit vorläufiger Note.
    Schalter mit **Auswahl** anklicken und **Leertaste** drücken. Treppenlicht geht nach 30 s wieder aus
@@ -57,6 +67,7 @@ Beim Prüfen leuchtet die Leuchte, Wippen zeigen die Schalterstellung, ein ausge
 
 ![3D-Anschlussansicht beim Abisolieren](docs/anschluss3d_abisolieren.png)
 ![3D-Anschlussansicht angeklemmt](docs/anschluss3d_angeklemmt.png)
+![Verteiler mit Phasenschiene und Aderendhülsen](docs/verteiler3d.png)
 ![Abgemantelte Leitung auf dem Brett](docs/abgemantelt_brett.png)
 
 ### Messen und Ausrichten

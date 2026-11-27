@@ -221,6 +221,7 @@ func _brett() -> void:
 	Modelle.kabelkanal(deko, Circuit.KABELKANAL)
 	Modelle.verteiler(deko, Circuit.VERTEILER_FELD, REIHEN)
 	Modelle.einspeisung_cee(deko, Vector3(-0.50, -0.37, 0), Circuit.VERTEILER_FELD.position.y)
+	_zuleitung_zeichnen(deko)
 	Modelle.zusammenfassen(deko)
 	_mess_knoten_anlegen()
 	bohr_knoten = Node3D.new()
@@ -510,8 +511,13 @@ func _startbildschirm() -> Control:
 	var hg := PanelContainer.new()
 	hg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hg.add_theme_stylebox_override("panel", Stil.box(Color(0.93, 0.94, 0.96, 1.0), 0))
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	hg.add_child(scroll)
 	var mitte_c := CenterContainer.new()
-	hg.add_child(mitte_c)
+	mitte_c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mitte_c.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(mitte_c)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	mitte_c.add_child(v)
@@ -538,6 +544,12 @@ func _startbildschirm() -> Control:
 	start_name.custom_minimum_size = Vector2(260, 0)
 	start_name.text_changed.connect(func(t: String) -> void: name_feld.text = t)
 	name_zeile.add_child(start_name)
+	var tut := _knopf("▶  Tutorial: So schließt du eine Steckdose an (Schritt für Schritt)", tutorial_starten)
+	tut.theme_type_variation = "AkzentButton"
+	tut.custom_minimum_size = Vector2(0, 44)
+	tut.add_theme_font_size_override("font_size", 17)
+	tut.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	v.add_child(tut)
 	v.add_child(Stil.ueberschrift("Wähle deinen Auftrag"))
 	var raster := GridContainer.new()
 	raster.columns = 3
@@ -1551,6 +1563,27 @@ func _leitung_zeichnen(l: Dictionary) -> void:
 	if info.qs >= 2.5:
 		r += 0.0008
 	var tube := MeshInstance3D.new()
+	if info.get("schiene", false):
+		# Phasenschiene: weisse Kammschiene oben auf FI und LS (Zaehne in die Eingangsklemmen)
+		tube.free()
+		var xs := []
+		var y_oben := -INF
+		for a in l.adern:
+			for f in ["von", "nach"]:
+				var gid: String = a[f].get_slice(":", 0)
+				if circuit.geraete.has(gid):
+					var gp: Vector3 = circuit.geraete[gid].pos
+					xs.append(gp.x)
+					y_oben = maxf(y_oben, gp.y)
+		if xs.size() >= 2:
+			var x0: float = xs.min() - 0.006
+			var x1: float = xs.max() + 0.006
+			var y := y_oben + 0.036
+			Modelle.box(knoten, Vector3(x1 - x0, 0.008, 0.004), Vector3((x0 + x1) / 2, y, 0.064), Modelle.mat(Color(0.93, 0.93, 0.9), 0.5))
+			Modelle.box(knoten, Vector3(x1 - x0, 0.003, 0.0045), Vector3((x0 + x1) / 2, y + 0.002, 0.064), Modelle.mat(Color(0.86, 0.55, 0.3), 0.3, 0.7))
+		add_child(knoten)
+		leitung_knoten[l.id] = knoten
+		return
 	if info.get("einzelader", false):
 		# Bruecke im Verteiler: duenne Einzelader in ihrer Farbe, etwas ueber den Geraeten
 		var hoch: Array = []
@@ -1732,6 +1765,28 @@ var raster_an := false
 var bauplan_an := false
 var raster_knopf: Button
 var bauplan_knopf: Button
+
+## Zuleitung vom CEE-Stecker: kommt unten in den Verteiler, laeuft links hoch und ist an L, N, PE
+## der Hauptklemme fest angeschlossen
+func _zuleitung_zeichnen(p: Node3D) -> void:
+	var netz := Vector3(-0.525, 0.255, 0)
+	var x := Circuit.VERTEILER_FELD.position.x + 0.012
+	var r := 0.0055
+	var mantel := [Vector3(-0.50, Circuit.VERTEILER_FELD.position.y + 0.004, 0.006), Vector3(-0.50, 0.0, 0.006),
+		Vector3(x, 0.012, 0.006), Vector3(x, 0.205, 0.006)]
+	var tube := MeshInstance3D.new()
+	tube.mesh = _rohr(mantel, r)
+	tube.material_override = mat_nym
+	p.add_child(tube)
+	var i := 0
+	for f in ["bn", "bu", "gnye"]:
+		var kx := netz.x + (i - 1) * 0.0167
+		var ader := MeshInstance3D.new()
+		ader.mesh = _rohr([Vector3(x + (i - 1) * 0.003, 0.205, 0.008), Vector3(x + (i - 1) * 0.003, 0.215, 0.010),
+			Vector3(kx, 0.226, 0.018), Vector3(kx, 0.238, 0.03)], 0.0016)
+		ader.material_override = Modelle.mat(ADERFARBE[f], 0.5)
+		p.add_child(ader)
+		i += 1
 
 func _mess_knoten_anlegen() -> void:
 	raster_knoten = Node3D.new()
@@ -1990,3 +2045,18 @@ func _hilfslinien(p: Vector3) -> void:
 	if not flucht.is_empty():
 		_linien(hilfs_knoten, flucht, 0.0012, _unbeleuchtet(Color(0.95, 0.35, 0.1, 0.9)), 0.07)
 		_status("%s setzen – fluchtet mit %s" % [BAUTEILE[bauteil_typ].name, ", ".join(namen)])
+
+# ---- Tutorial
+
+var tutorial: Tutorial
+
+## Startet das Tutorial auf einem leeren Brett (Auftrag Steckdosenkreis)
+func tutorial_starten() -> void:
+	aufgabe_starten("steckdosenkreis")
+	auftrag_karte.hide()
+	if tutorial and is_instance_valid(tutorial):
+		tutorial.queue_free()
+	tutorial = Tutorial.new(self)
+	ui_wurzel.add_child(tutorial)
+	tutorial.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	tutorial.position = Vector2(PANEL_BREITE + 12, maxf(kopfleiste.size.y, 50) + 60)

@@ -10,6 +10,7 @@ extends PanelContainer
 const VERTEILER := ["einspeisung", "n_schiene", "pe_schiene", "fi", "ls", "schuetz", "zeitrelais", "treppenlicht"]   # alles auf der Hutschiene
 const FARBNAME := {"bn": "braun", "bu": "blau", "gnye": "grün-gelb", "bk": "schwarz", "gy": "grau"}
 const MAX_ADERN_SCHRAUBKLEMME := 2
+const BRUECKEN_FARBEN := ["bn", "bk", "gy", "bu", "gnye"]
 
 var montage: Node   # montage.gd
 var geraet := ""
@@ -17,12 +18,14 @@ var gruppe: Array = []
 ## Auswahl: {"art": "ader", "leitung": Dictionary, "index": int, "feld": "von"/"nach"} oder {"art": "klemme", "klemme": String}
 var auswahl := {}
 var bruecken_farbe := "bn"
-enum Modus { ABMANTELN, ABISOLIEREN, ANKLEMMEN }
+enum Modus { ABMANTELN, ABISOLIEREN, ANKLEMMEN, BRUECKE, CRIMPEN }
 var modus: int = Modus.ANKLEMMEN
 
 var ansicht3d: Anschluss3D
 var _liste: Control
 var _modus_knoepfe := {}
+var _verteiler_zeile: HBoxContainer
+var _farbwahl: OptionButton
 
 var _titel: Label
 var _hinweis: Label
@@ -88,6 +91,40 @@ func _ready() -> void:
 	schritte.add_child(mm)
 	_extra = HBoxContainer.new()
 	schritte.add_child(_extra)
+	# Nur im Verteiler: Bruecken mit H07V-K, Aderendhuelsen crimpen, Phasenschiene
+	_verteiler_zeile = HBoxContainer.new()
+	_verteiler_zeile.add_theme_constant_override("separation", 6)
+	v.add_child(_verteiler_zeile)
+	for m in [[Modus.BRUECKE, "④ Brücke H07V-K"], [Modus.CRIMPEN, "⑤ Aderendhülse crimpen"]]:
+		var b := Button.new()
+		b.text = m[1]
+		b.toggle_mode = true
+		b.focus_mode = Control.FOCUS_NONE
+		b.pressed.connect(modus_setzen.bind(m[0]))
+		var ico := _ico(m[0])
+		if ico:
+			b.icon = ico
+			b.add_theme_constant_override("icon_max_width", 24)
+		_verteiler_zeile.add_child(b)
+		_modus_knoepfe[m[0]] = b
+		if m[0] == Modus.BRUECKE:
+			_farbwahl = OptionButton.new()
+			_farbwahl.focus_mode = Control.FOCUS_NONE
+			_farbwahl.tooltip_text = "Aderfarbe der Brücke"
+			for f in BRUECKEN_FARBEN:
+				_farbwahl.add_item(FARBNAME[f])
+			_farbwahl.item_selected.connect(func(i: int) -> void: bruecken_farbe = BRUECKEN_FARBEN[i])
+			_verteiler_zeile.add_child(_farbwahl)
+	var schiene := Button.new()
+	schiene.text = "Phasenschiene aufstecken"
+	schiene.focus_mode = Control.FOCUS_NONE
+	schiene.tooltip_text = "Kammschiene 1-polig: verbindet FI-Ausgang L mit dem Eingang aller LS"
+	var sico := _ico(-1)
+	if sico:
+		schiene.icon = sico
+		schiene.add_theme_constant_override("icon_max_width", 24)
+	schiene.pressed.connect(func() -> void: phasenschiene_aufstecken())
+	_verteiler_zeile.add_child(schiene)
 	ansicht3d = Anschluss3D.new()
 	ansicht3d.geklickt.connect(_3d_klick)
 	ansicht3d.ueber.connect(func(t: String) -> void:
@@ -128,12 +165,17 @@ func oeffnen(id: String) -> void:
 	else:
 		gruppe = [id]
 		_titel.text = "Nahansicht: %s" % id
+	_verteiler_zeile.visible = typ in VERTEILER
+	if not _verteiler_zeile.visible and modus >= Modus.BRUECKE:
+		modus = Modus.ANKLEMMEN
 	show()
 	_aufbauen()
 	modus_setzen(modus)
 
 func modus_setzen(m: int) -> void:
 	modus = m
+	if _farbwahl:
+		_farbwahl.selected = BRUECKEN_FARBEN.find(bruecken_farbe)
 	auswahl = {}
 	for k in _modus_knoepfe:
 		_modus_knoepfe[k].button_pressed = k == m
@@ -141,6 +183,8 @@ func modus_setzen(m: int) -> void:
 		Modus.ABMANTELN: _hinweis.text = "① Abmantelungswerkzeug: den grauen Mantel einer Leitung unten anklicken. Geht nur, wenn die Leitung höchstens 10 cm vor dem Gerät befestigt ist."
 		Modus.ABISOLIEREN: _hinweis.text = "② Abisolierzange (%d mm): jede Ader einzeln anklicken. Richtig sind 8 bis 12 mm." % montage.abisolier_mm
 		Modus.ANKLEMMEN: _hinweis.text = "③ Schraubendreher: Ader anklicken, dann die Klemme. Nur abisolierte Adern haben Kontakt."
+		Modus.BRUECKE: _hinweis.text = "④ Brücke mit H07V-K (Farbe rechts wählen): erste Klemme anklicken, dann die zweite. Die Ader wird abgelängt und abisoliert. Brücke anklicken = entfernen."
+		Modus.CRIMPEN: _hinweis.text = "⑤ Crimpzange: jedes Ende einer H07V-K-Brücke anklicken (gelber Punkt an der Klemme). Feindrähtige Adern brauchen eine Aderendhülse."
 	_aufbauen()
 
 func _3d_klick(art: String, d: Dictionary) -> void:
@@ -159,12 +203,28 @@ func _3d_klick(art: String, d: Dictionary) -> void:
 			else:
 				_hinweis.text = "Die Leitung ist schon abgemantelt. Weiter mit „② Abisolieren“."
 		"klemme":
+			if modus == Modus.BRUECKE:
+				if auswahl.get("art", "") == "klemme" and auswahl.klemme != d.klemme:
+					_bruecke_legen(auswahl.klemme, d.klemme)
+				else:
+					auswahl = {"art": "klemme", "klemme": d.klemme}
+					_hinweis.text = "Brücke beginnt an %s. Jetzt die zweite Klemme anklicken." % d.klemme
+					_aufbauen()
+				return
 			if modus != Modus.ANKLEMMEN:
-				_hinweis.text = "Klemme %s. Zum Anschließen „③ Anklemmen“ wählen." % d.klemme
+				_hinweis.text = "Klemme %s. Zum Anschließen „③ Anklemmen“ wählen, für Brücken „④ Brücke“." % d.klemme
 				return
 			_klemme_gewaehlt(d.klemme)
-		"bruecke":
+		"bruecke", "schiene":
+			if modus != Modus.BRUECKE:
+				_hinweis.text = "%s. Zum Entfernen „④ Brücke“ wählen und nochmal anklicken." % ("Phasenschiene" if art == "schiene" else "Brücke " + d.leitung.id)
+				return
 			_bruecke_entfernen(d.leitung)
+		"brueckenende":
+			if modus != Modus.CRIMPEN:
+				_hinweis.text = "Ende der Brücke %s an %s%s. Zum Crimpen „⑤ Aderendhülse crimpen“ wählen." % [d.leitung.id, d.leitung.adern[0][d.feld], " (Aderendhülse sitzt)" if d.leitung.adern[0].get("huelse_" + d.feld, false) else ""]
+				return
+			crimpen(d.leitung, d.feld)
 
 ## Leitungsende abmanteln: nur wenn die Leitung vor dem Geraet befestigt ist
 func abmanteln(l: Dictionary, ende: String) -> bool:
@@ -217,20 +277,6 @@ func _aufbauen() -> void:
 		b.text = "Verbindungsklemme (5-fach) einsetzen"
 		b.pressed.connect(_klemme_einsetzen)
 		_extra.add_child(b)
-	if typ in VERTEILER:
-		var lbl := Label.new()
-		lbl.text = "Brücke (H07V-K 1,5):"
-		_extra.add_child(lbl)
-		var ob := OptionButton.new()
-		var farben := ["bn", "bk", "gy", "bu", "gnye"]
-		for f in farben:
-			ob.add_item(FARBNAME[f])
-		ob.selected = farben.find(bruecken_farbe)
-		ob.item_selected.connect(func(i: int) -> void: bruecken_farbe = farben[i])
-		_extra.add_child(ob)
-		var hb := Label.new()
-		hb.text = "  (zwei Klemmen nacheinander anklicken)"
-		_extra.add_child(hb)
 	var los := Button.new()
 	los.text = "Ausgewählte Ader lösen"
 	los.pressed.connect(_loesen)
@@ -301,6 +347,8 @@ func _aufbauen() -> void:
 func _belegung(kid: String) -> Array:
 	var r := []
 	for l in _c().leitungen:
+		if Circuit.LEITUNGEN[l.typ].get("schiene", false):
+			continue   # die Kammschiene sitzt im eigenen Klemmraum
 		for a in l.adern:
 			for f in ["von", "nach"]:
 				if a.get(f, "") == kid:
@@ -371,23 +419,19 @@ func _bruecke_legen(k1: String, k2: String) -> void:
 		auswahl = {}
 		_aufbauen()
 		return
-	var n := 1
-	var ids := []
-	for l in _c().leitungen:
-		ids.append(l.id)
-	while ("B%d" % n) in ids:
-		n += 1
+	var n := _freie_nummer("B")
 	var g1: String = k1.get_slice(":", 0)
 	var g2: String = k2.get_slice(":", 0)
 	var l := {
 		"id": "B%d" % n, "typ": "H07V-K 1,5",
 		"punkte": [_c().geraete[g1].pos, _c().geraete[g2].pos], "schellen": [],
 		"abgemantelt": {"start": true, "ende": true},
-		"adern": [{"farbe": bruecken_farbe, "von": k1, "nach": k2, "abisoliert_von": 10.0, "abisoliert_nach": 10.0}],
+		"adern": [{"farbe": bruecken_farbe, "von": k1, "nach": k2, "abisoliert_von": 10.0, "abisoliert_nach": 10.0,
+			"huelse_von": false, "huelse_nach": false}],
 		"start_geraet": g1, "ende_geraet": g2,
 	}
 	_c().leitung_hinzufuegen(l)
-	_hinweis.text = "Brücke B%d (%s) von %s nach %s gelegt." % [n, FARBNAME[bruecken_farbe], k1, k2]
+	_hinweis.text = "Brücke B%d (%s) von %s nach %s gelegt. Jetzt mit „⑤ Aderendhülse crimpen“ beide Enden versorgen." % [n, FARBNAME[bruecken_farbe], k1, k2]
 	auswahl = {}
 	montage.nahansicht_geaendert()
 	_aufbauen()
@@ -400,5 +444,65 @@ func _bruecke_entfernen(l: Dictionary) -> void:
 	_aufbauen()
 
 func _ico(m: int) -> Texture2D:
-	var pfad := "res://grafik/werkzeuge/%s.png" % ["abmanteln", "abisolieren", "anklemmen"][m]
+	var namen := {Modus.ABMANTELN: "abmanteln", Modus.ABISOLIEREN: "abisolieren", Modus.ANKLEMMEN: "anklemmen",
+		Modus.BRUECKE: "bruecke", Modus.CRIMPEN: "crimpen", -1: "phasenschiene"}
+	var pfad := "res://grafik/werkzeuge/%s.png" % namen[m]
 	return load(pfad) if ResourceLoader.exists(pfad) else null
+
+func _freie_nummer(praefix: String) -> int:
+	var ids := []
+	for l in _c().leitungen:
+		ids.append(l.id)
+	var n := 1
+	while ("%s%d" % [praefix, n]) in ids:
+		n += 1
+	return n
+
+## Aderendhuelse auf ein Brueckenende crimpen (H07V-K ist feindraehtig)
+func crimpen(l: Dictionary, feld: String) -> void:
+	if not Circuit.LEITUNGEN[l.typ].get("feindraehtig", false):
+		_hinweis.text = "Nur feindrähtige Adern (H07V-K) brauchen eine Aderendhülse."
+		return
+	var a: Dictionary = l.adern[0]
+	if a.get("huelse_" + feld, false):
+		_hinweis.text = "Am Ende %s sitzt schon eine Aderendhülse." % a[feld]
+		return
+	a["huelse_" + feld] = true
+	var anderes := "nach" if feld == "von" else "von"
+	_hinweis.text = "Aderendhülse an %s gecrimpt.%s" % [a[feld], "" if a.get("huelse_" + anderes, false) else " Das andere Ende (%s) noch crimpen." % a[anderes]]
+	montage.nahansicht_geaendert()
+	_aufbauen()
+
+## Phasenschiene (Kammschiene 1-polig) auf FI-Ausgang L und alle LS-Eingaenge stecken
+func phasenschiene_aufstecken() -> bool:
+	var fi := ""
+	var ls := []
+	for gid in _c().geraete:
+		var t: String = _c().geraete[gid].typ
+		if t == "fi" and fi == "": fi = gid
+		if t == "ls": ls.append(gid)
+	if fi == "" or ls.is_empty():
+		_hinweis.text = "Für die Phasenschiene braucht man einen FI und mindestens einen LS auf der Hutschiene."
+		return false
+	ls.sort_custom(func(x, y): return (_c().geraete[x].pos as Vector3).x < (_c().geraete[y].pos as Vector3).x)
+	for l in _c().leitungen.duplicate():
+		if Circuit.LEITUNGEN[l.typ].get("schiene", false):
+			_c().leitungen.erase(l)
+	var adern := []
+	var vorher := fi + ":L_out"
+	for gid in ls:
+		adern.append({"farbe": "cu", "von": vorher, "nach": gid + ":in", "abisoliert_von": 10.0, "abisoliert_nach": 10.0})
+		vorher = gid + ":in"
+	var l := {
+		"id": "P1", "typ": "Phasenschiene 1p",
+		"punkte": [_c().geraete[fi].pos, _c().geraete[ls[-1]].pos], "schellen": [],
+		"abgemantelt": {"start": true, "ende": true}, "adern": adern,
+		"start_geraet": fi, "ende_geraet": ls[-1],
+	}
+	_c().leitung_hinzufuegen(l)
+	_hinweis.text = "Phasenschiene aufgesteckt: %s L → %s. Den N vom FI (N_out) noch mit einer blauen H07V-K-Brücke auf die N-Klemme legen." % [fi, ", ".join(ls)]
+	montage.nahansicht_geaendert()
+	montage._alles_neu_zeichnen()
+	show()
+	_aufbauen()
+	return true

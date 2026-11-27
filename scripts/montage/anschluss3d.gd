@@ -102,9 +102,13 @@ func aufbauen(c: Circuit, gruppe: Array, auswahl: Dictionary, farben: Dictionary
 	var x0 := -abstand * (enden.size() - 1) / 2.0
 	for i in enden.size():
 		_leitungsende(enden[i][0], enden[i][1], enden[i][2], Vector3(x0 + i * abstand, unten, 0), klemme_pos, auswahl, farben)
-	# Bruecken im Verteiler (H07V-K)
+	# Bruecken im Verteiler (H07V-K) und Phasenschiene
 	for l in c.leitungen:
-		if not Circuit.LEITUNGEN[l.typ].get("einzelader", false):
+		var info: Dictionary = Circuit.LEITUNGEN[l.typ]
+		if not info.get("einzelader", false):
+			continue
+		if info.get("schiene", false):
+			_schiene(l, klemme_pos)
 			continue
 		var a: Dictionary = l.adern[0]
 		if klemme_pos.has(a.von) and klemme_pos.has(a.nach):
@@ -113,7 +117,23 @@ func aufbauen(c: Circuit, gruppe: Array, auswahl: Dictionary, farben: Dictionary
 			var mitte := (p1 + p2) / 2 + Vector3(0, 0, 3.0 + p1.distance_to(p2) * 0.08)
 			var pts := _kurve([p1 + Vector3(0, 0, 0.3), p1 + Vector3(0, 0, 2), mitte, p2 + Vector3(0, 0, 2), p2 + Vector3(0, 0, 0.3)])
 			_schlauch(pts, 0.22, Modelle.mat(farben.get(a.farbe, Color.BLACK), 0.5))
-			picks.append({"pos": mitte, "art": "bruecke", "daten": {"leitung": l}, "text": "Brücke %s: %s ↔ %s (anklicken zum Entfernen)" % [l.id, a.von, a.nach]})
+			picks.append({"pos": mitte, "art": "bruecke", "daten": {"leitung": l}, "text": "Brücke %s: %s ↔ %s" % [l.id, a.von, a.nach]})
+			for e in [["von", p1], ["nach", p2]]:
+				var kp: Vector3 = e[1]
+				var huelse: bool = a.get("huelse_" + e[0], false)
+				if huelse:
+					# Aderendhuelse: roter Kragen (1,5 mm²) und Metallhuelse in der Klemme
+					Werkzeugmodelle.stab(welt, kp + Vector3(0, 0, 0.9), kp + Vector3(0, 0, 1.7), 0.36, Modelle.mat(Color(0.85, 0.1, 0.1), 0.45), 0.3)
+					Werkzeugmodelle.stab(welt, kp + Vector3(0, 0, 0.0), kp + Vector3(0, 0, 0.9), 0.25, Modelle.mat(Color(0.82, 0.83, 0.86), 0.25, 0.8))
+				else:
+					Werkzeugmodelle.stab(welt, kp + Vector3(0, 0, 0.0), kp + Vector3(0, 0, 0.6), 0.16, Anschluss3D._kupfer())
+					_markierung(kp + Vector3(0, 0, 1.7))
+				picks.append({"pos": kp + Vector3(0, 0, 1.3), "art": "brueckenende", "daten": {"leitung": l, "feld": e[0]},
+					"text": "Brücke %s an %s: %s" % [l.id, a[e[0]], "Aderendhülse gecrimpt" if huelse else "OHNE Aderendhülse (crimpen!)"]})
+	# Zuleitung zur Hauptklemme: fest angeschlossen, kommt von links aus dem Rohr
+	for gid in gruppe:
+		if c.geraete[gid].typ == "einspeisung" and klemme_pos.has(gid + ":L"):
+			_zuleitung(gid, klemme_pos, farben)
 	# Kamera so, dass alles drauf ist
 	var hoehe := -unten + 14.0
 	ziel = Vector3(0, (unten - 6.0 + 9.0) / 2.0, 0)
@@ -301,3 +321,52 @@ static func _kupfer() -> StandardMaterial3D:
 	m.emission_enabled = true
 	m.emission = Color(0.55, 0.3, 0.1)
 	return m
+
+## Gelber Punkt ueber einem Brueckenende ohne Aderendhuelse
+func _markierung(pos: Vector3) -> void:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(1.0, 0.85, 0.1)
+	m.emission_enabled = true
+	m.emission = Color(0.9, 0.7, 0.0)
+	Werkzeugmodelle.kugel(welt, 0.42, pos, m)
+
+## Phasenschiene: Kupferschiene ueber den Klemmen mit Zaehnen in jede Klemme
+func _schiene(l: Dictionary, klemme_pos: Dictionary) -> void:
+	var punkte := []
+	for a in l.adern:
+		for f in ["von", "nach"]:
+			if klemme_pos.has(a[f]) and not (klemme_pos[a[f]] in punkte):
+				punkte.append(klemme_pos[a[f]])
+	if punkte.size() < 2:
+		return
+	punkte.sort_custom(func(x: Vector3, y: Vector3) -> bool: return x.x < y.x)
+	var hoehe := 1.8
+	var kupfer := Modelle.mat(Color(0.86, 0.55, 0.3), 0.3, 0.7)
+	var isolierung := Modelle.mat(Color(0.55, 0.57, 0.6), 0.5)
+	var a: Vector3 = punkte[0]
+	var b: Vector3 = punkte[-1]
+	var y := maxf(a.y, b.y) + 3.4   # ueber den Schrauben
+	Modelle.box(welt, Vector3(b.x - a.x + 1.6, 1.0, 0.8), Vector3((a.x + b.x) / 2, y, hoehe), isolierung)
+	Modelle.box(welt, Vector3(b.x - a.x + 1.4, 0.45, 0.85), Vector3((a.x + b.x) / 2, y + 0.1, hoehe + 0.05), kupfer)
+	for p in punkte:
+		# Zahn der Kammschiene steckt von oben in die Klemme
+		Modelle.box(welt, Vector3(0.7, y - p.y - 2.0, 0.3), Vector3(p.x, (y + p.y + 2.0) / 2, hoehe - 0.2), kupfer)
+	picks.append({"pos": Vector3((a.x + b.x) / 2, y, hoehe + 0.4), "art": "schiene", "daten": {"leitung": l},
+		"text": "Phasenschiene (Kammschiene 1-polig): verbindet %d Klemmen" % punkte.size()})
+	_text_welt("Phasenschiene", Vector3((a.x + b.x) / 2, y + 0.9, hoehe + 0.5), 20, Color(0.45, 0.25, 0.1))
+
+## Zuleitung NYM-J 3x2,5 vom CEE-Stecker an L, N, PE der Hauptklemme
+func _zuleitung(gid: String, klemme_pos: Dictionary, farben: Dictionary) -> void:
+	var l: Vector3 = klemme_pos[gid + ":L"]
+	var start := l + Vector3(-9.0, -4.5, 0)
+	var knick := l + Vector3(-4.0, -4.5, 0)
+	_schlauch([start, knick], 0.7, Modelle.mat(Modelle.NYM, 0.55))
+	_text_welt("Zuleitung vom CEE-Stecker\n(fest angeschlossen)", start + Vector3(0, -1.6, 0.5), 18, Color(0.3, 0.3, 0.33))
+	var i := 0
+	for k in [["L", "bn"], ["N", "bu"], ["PE", "gnye"]]:
+		var kp: Vector3 = klemme_pos.get(gid + ":" + k[0], l)
+		var ab := knick + Vector3(0, (i - 1) * 0.35, 0)
+		var pts := _kurve([ab, ab + Vector3(2, 0, 0), kp + Vector3(0, -3.0, 0.6), kp + Vector3(0, -1.2, 0.2)])
+		_schlauch(pts, 0.22, Modelle.mat(farben.get(k[1], Color.BLACK), 0.5))
+		_schlauch([kp + Vector3(0, -1.2, 0.2), kp], 0.15, Anschluss3D._kupfer())
+		i += 1

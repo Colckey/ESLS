@@ -37,7 +37,9 @@ const LEITUNGEN := {
 	"NYM-O 3x1,5": {"adern": ["bn", "bk", "gy"], "qs": 1.5},
 	"Steuerleitung 7x1,5": {"adern": ["1", "2", "3", "4", "5", "6", "gnye"], "qs": 1.5},
 	# Einzelader fuer die Verdrahtung im Verteiler (Bruecken), braucht keine Schellen
-	"H07V-K 1,5": {"adern": ["bn", "bk", "gy", "bu", "gnye"], "qs": 1.5, "einzelader": true},
+	"H07V-K 1,5": {"adern": ["bn", "bk", "gy", "bu", "gnye"], "qs": 1.5, "einzelader": true, "feindraehtig": true},
+	# Phasenschiene (Kammschiene) 1-polig, wird auf FI und LS gesteckt; jede "Ader" ist ein Abschnitt
+	"Phasenschiene 1p": {"adern": ["cu", "cu", "cu", "cu", "cu", "cu", "cu", "cu", "cu", "cu", "cu", "cu"], "qs": 10.0, "einzelader": true, "schiene": true},
 }
 
 ## Maximaler LS-Nennstrom je Querschnitt (vereinfachte Verlegeart C, NYM auf Wand)
@@ -135,6 +137,11 @@ func _montage_pruefen(r: Dictionary) -> void:
 					r.warnungen.append("%s: Ader %s an %s zu kurz abisoliert (%d mm)." % [l.id, a.farbe, a[ende], lg])
 				elif lg > ABISOLIERLAENGE.y:
 					r.fehler.append("%s: Ader %s an %s zu lang abisoliert (%d mm), blankes Kupfer sichtbar." % [l.id, a.farbe, a[ende], lg])
+				# Feindraehtige Einzeladern (H07V-K) brauchen eine gecrimpte Aderendhuelse
+				if info.get("feindraehtig", false) and not a.get("huelse_" + ende, false):
+					r.fehler.append("%s: feindrähtige Ader %s an %s ohne Aderendhülse (crimpen!)." % [l.id, a.farbe, a[ende]])
+				if info.get("schiene", false):
+					continue
 				# Farbregeln
 				if _typ(a[ende]) == "klemme":
 					continue   # Verbindungsklemme: Farbregel gilt an den Geraeten
@@ -152,7 +159,7 @@ func _montage_pruefen(r: Dictionary) -> void:
 		for a in l.adern:
 			for ende in ["von", "nach"]:
 				var k: String = a.get(ende, "")
-				if k != "" and _typ(k) == "ls" and not gemeldet.has(k.get_slice(":", 0)):
+				if k != "" and not info.get("schiene", false) and _typ(k) == "ls" and not gemeldet.has(k.get_slice(":", 0)):
 					var nenn: int = geraete[k.get_slice(":", 0)].param.get("nennstrom", 16)
 					if nenn > MAX_LS.get(info.qs, 0):
 						gemeldet[k.get_slice(":", 0)] = true

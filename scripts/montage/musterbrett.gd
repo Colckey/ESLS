@@ -114,10 +114,11 @@ static func _verdrahten(m: Node) -> void:
 	m._nahansicht_oeffnen("fi1")
 	var n: Nahansicht = m.nahansicht
 	# Verteiler: Bruecken mit H07V-K
-	for b in [["bn", "netz:L", "fi1:L_in"], ["bu", "netz:N", "fi1:N_in"], ["bn", "fi1:L_out", "ls1:in"],
-			["bn", "ls1:in", "ls2:in"], ["bu", "fi1:N_out", "x_n:1"], ["gnye", "netz:PE", "x_pe:1"]]:
+	for b in [["bn", "netz:L", "fi1:L_in"], ["bu", "netz:N", "fi1:N_in"], ["bu", "fi1:N_out", "x_n:1"], ["gnye", "netz:PE", "x_pe:1"]]:
 		n.bruecken_farbe = b[0]
 		n._bruecke_legen(b[1], b[2])
+	n.phasenschiene_aufstecken()   # FI L_out -> ls1:in -> ls2:in
+	alle_crimpen(n)
 	# Adern: [Leitung, Index, Ende, Klemme]   NYM-J 3x: bn bu gnye   NYM-J 5x: bn bk gy bu gnye
 	var adern := [
 		["W1", 0, "von", "ls1:out"], ["W1", 1, "von", "x_n:2"], ["W1", 2, "von", "x_pe:2"],
@@ -151,3 +152,11 @@ static func _verdrahten(m: Node) -> void:
 static func _klemmen(n: Nahansicht, w: Dictionary, liste: Array) -> void:
 	for a in liste:
 		n._anklemmen(w[a[0]], a[1], a[2], a[3])
+
+## Aderendhuelsen auf alle Enden der H07V-K-Bruecken crimpen
+static func alle_crimpen(n: Nahansicht) -> void:
+	for l in n.montage.circuit.leitungen:
+		if Circuit.LEITUNGEN[l.typ].get("feindraehtig", false):
+			for f in ["von", "nach"]:
+				if not l.adern[0].get("huelse_" + f, false):
+					n.crimpen(l, f)

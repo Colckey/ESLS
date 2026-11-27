@@ -80,7 +80,8 @@ func aufbau() -> Circuit:
 func _l(id: String, typ: String, adern: Array, schellen: Array) -> Dictionary:
 	var a := []
 	for x in adern:
-		a.append({"farbe": x[0], "von": x[1], "nach": x[2], "abisoliert_von": 10.0, "abisoliert_nach": 10.0})
+		a.append({"farbe": x[0], "von": x[1], "nach": x[2], "abisoliert_von": 10.0, "abisoliert_nach": 10.0,
+			"huelse_von": true, "huelse_nach": true})
 	return {"id": id, "typ": typ, "punkte": schellen, "schellen": schellen,
 		"abgemantelt": {"start": true, "ende": true}, "adern": a}
 

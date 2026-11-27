@@ -47,7 +47,7 @@ func _initialize() -> void:
 	for typ in bauteile:
 		var gr: Vector3 = bauteile[typ].groesse
 		await _bild(Modelle.geraet(typ, gr, {"klemmen": 3} if typ == "abzweigdose" else {}), "res://grafik/bauteile/%s.png" % typ)
-	for w in ["auswahl", "bohrer", "schelle", "seitenschneider", "abmanteln", "abisolieren", "anklemmen", "zollstock", "wasserwaage"]:
+	for w in ["auswahl", "bohrer", "schelle", "seitenschneider", "abmanteln", "abisolieren", "anklemmen", "zollstock", "wasserwaage", "crimpen", "bruecke", "phasenschiene"]:
 		await _bild(Werkzeugmodelle.werkzeug(w), "res://grafik/werkzeuge/%s.png" % w, w != "auswahl")
 	for typ in Circuit.LEITUNGEN:
 		await _bild(Werkzeugmodelle.leitung(typ, aderfarbe), "res://grafik/leitungen/%s.png" % _dateiname(typ))
