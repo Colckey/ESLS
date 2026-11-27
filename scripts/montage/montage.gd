@@ -1770,23 +1770,31 @@ var bauplan_knopf: Button
 ## der Hauptklemme fest angeschlossen
 func _zuleitung_zeichnen(p: Node3D) -> void:
 	var netz := Vector3(-0.525, 0.255, 0)
-	var x := Circuit.VERTEILER_FELD.position.x + 0.012
-	var r := 0.0055
-	var mantel := [Vector3(-0.50, Circuit.VERTEILER_FELD.position.y + 0.004, 0.006), Vector3(-0.50, 0.0, 0.006),
-		Vector3(x, 0.012, 0.006), Vector3(x, 0.205, 0.006)]
+	var x := -0.541
+	var r := 0.0065
+	var z := 0.014   # ueber der Hutschiene
+	var mantel := [Vector3(-0.50, Circuit.VERTEILER_FELD.position.y - 0.01, z), Vector3(-0.50, 0.012, z),
+		Vector3(x, 0.012, z), Vector3(x, 0.20, z)]
 	var tube := MeshInstance3D.new()
 	tube.mesh = _rohr(mantel, r)
-	tube.material_override = mat_nym
+	tube.material_override = Modelle.mat(Color(0.66, 0.67, 0.70), 0.45)
+	tube.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	p.add_child(tube)
+	var kante := MeshInstance3D.new()
+	kante.mesh = _rohr([Vector3(x, 0.199, z), Vector3(x, 0.202, z)], r * 1.05)
+	kante.material_override = Modelle.mat(Color(0.97, 0.97, 0.95), 0.6)
+	p.add_child(kante)
 	var i := 0
 	for f in ["bn", "bu", "gnye"]:
 		var kx := netz.x + (i - 1) * 0.0167
 		var ader := MeshInstance3D.new()
-		ader.mesh = _rohr([Vector3(x + (i - 1) * 0.003, 0.205, 0.008), Vector3(x + (i - 1) * 0.003, 0.215, 0.010),
-			Vector3(kx, 0.226, 0.018), Vector3(kx, 0.238, 0.03)], 0.0016)
+		ader.mesh = _rohr([Vector3(x + (i - 1) * 0.0035, 0.20, z + r * 0.6), Vector3(x + (i - 1) * 0.0035, 0.213, z + r * 0.6),
+			Vector3(kx, 0.226, z), Vector3(kx, 0.240, 0.03)], 0.0022)
 		ader.material_override = Modelle.mat(ADERFARBE[f], 0.5)
 		p.add_child(ader)
 		i += 1
+	var schild := Modelle.schrift(p, "Zuleitung\nNYM-J 3x2,5\n(fertig angeschlossen)", Vector3(x + 0.03, 0.03, z + 0.01), 16, Color(0.3, 0.3, 0.33))
+	schild.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 
 func _mess_knoten_anlegen() -> void:
 	raster_knoten = Node3D.new()
