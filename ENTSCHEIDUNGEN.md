@@ -15,8 +15,8 @@ Bitte kurz durchsehen. Alles lässt sich leicht ändern.
 | 9 | Einen FI pro Brett (für die Fehlerstromprüfung) | Reicht für Lehrjahr 1/2 | Mehrere FIs (später) |
 | 10 | Speicherdatei `.esim` (ZIP mit JSON + Prüfsumme) | Läuft auf jedem PC, Lehrer sieht Manipulation | – |
 | 11 | Godot 4.7 statt 4.3 | Ist bei dir installiert | – |
-| 12 | Abmanteln/Abisolieren: Bauteil anklicken, jeder Klick bearbeitet die nächste Leitung dort | Mehrere Leitungen enden am selben Punkt, so gibt es keine Verwechslung | Leitungsende einzeln anklicken (später, wenn Leitungen am Gehäuserand einführen) |
-| 13 | Abisolieren gilt für alle Adern einer Leitung gleichzeitig | Schneller; Fehler „zu lang/zu kurz“ wird trotzdem bewertet | Jede Ader einzeln (später in der Nahansicht) |
+| 12 | Abmanteln/Abisolieren/Anklemmen in einer 3D-Anschlussansicht: Gerät anklicken, dann Mantel bzw. Ader anklicken (geändert nach Test) | Schüler sieht jedes Leitungsende einzeln und wie die Ader in die Klemme läuft | Direkt auf dem Brett klicken (vorher, war unklar) |
+| 13 | Abisolieren für jede Ader einzeln (geändert nach Test) | Wie in der Praxis; Fehler „zu lang/zu kurz“ wird pro Ader bewertet | Alle Adern auf einmal (vorher) |
 | 14 | Nahansicht als Fenster rechts, Kamera zoomt auf das Bauteil | Läuft sicher auf schwachen PCs, gut lesbar | Klemmen direkt im 3D-Modell anklicken (späterer Ausbau) |
 | 15 | Verteiler = Einspeisung + FI + alle LS gemeinsam; Verdrahtung darin mit H07V-K-Brücken | Wie ein Kleinverteiler in der Schule | Eigene Hutschiene als Bauteil |
 | 16 | Schraubklemme max. 2 Adern, Verbindungsklemme (Wago) 1 Ader pro Steckplatz | Herstellerangaben üblich | – |
@@ -38,3 +38,6 @@ Bitte kurz durchsehen. Alles lässt sich leicht ändern.
 | 32 | Helles Design mit Schulblau, grüner Prüfen-Knopf, Startbildschirm mit Auftragskarten | Soll wie ein Lernprogramm für die Schule aussehen | Dunkles Design (vorher) |
 | 33 | Grafik „hoch“ (Schatten, 2× Kantenglättung) ist Standard, „niedrig“ per Knopf rechts | Schöner auf normalen PCs, schaltbar für sehr alte | Automatisch nach FPS umschalten |
 | 34 | Teile eines Geräts mit gleichem Material werden zu einem Mesh zusammengefasst | Halbiert die Zeichenaufrufe (979 → 573 beim fertigen Brett) | – |
+| 35 | Abmanteln geht erst, wenn die Leitung höchstens 10 cm vor dem Gerät befestigt ist (Schelle, Kanal oder Verteiler) | Gibt den Schellen einen Sinn und erzwingt die Reihenfolge verlegen → befestigen → abmanteln | Nur beim Prüfen bemängeln |
+| 36 | Auf dem Brett endet der Mantel 3 cm vor dem Geräterand, die Adern sind in ihren Farben sichtbar | Man sieht sofort, welche Enden schon abgemantelt sind | Mantel bis ins Gerät |
+| 37 | Zollstock, Wasserwaage, cm-Raster (R) und Bauplan (B) mit den Maßen aus dem Foto | Brett soll genau wie auf dem Bild gebaut werden können | Freie Maßlinien |

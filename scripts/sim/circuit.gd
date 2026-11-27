@@ -161,14 +161,32 @@ func _montage_pruefen(r: Dictionary) -> void:
 ## Befestigung: Iso-Schellen, Kabelkanal und Verteiler halten die Leitung.
 ## Gemessen wird entlang der Leitung (Laufmeter), nicht in Luftlinie.
 func _befestigung_pruefen(l: Dictionary, r: Dictionary) -> void:
+	var gesamt := laenge(l)
+	var halt := befestigte_abschnitte(l)
+	if halt.is_empty():
+		r.fehler.append("%s: Leitung ist nicht mit Iso-Schellen befestigt." % l.id)
+		return
+	if halt[0][0] > MAX_ENDABSTAND + 0.001 or gesamt - _max_ende(halt) > MAX_ENDABSTAND + 0.001:
+		r.fehler.append("%s: Erste/letzte Iso-Schelle mehr als %d cm vom Gerät entfernt." % [l.id, int(MAX_ENDABSTAND * 100)])
+	var bis: float = halt[0][1]
+	for h in halt:
+		if h[0] - bis > MAX_SCHELLENABSTAND + 0.001:
+			r.fehler.append("%s: Schellenabstand über %d cm." % [l.id, int(MAX_SCHELLENABSTAND * 100)])
+			break
+		bis = maxf(bis, h[1])
+
+static func laenge(l: Dictionary) -> float:
 	var verlauf: Array = l.get("punkte", [])
-	var schellen: Array = l.get("schellen", [])
 	var gesamt := 0.0
 	for i in range(verlauf.size() - 1):
 		gesamt += (verlauf[i] as Vector3).distance_to(verlauf[i + 1])
-	# Befestigte Abschnitte als [von, bis] in Laufmetern
+	return gesamt
+
+## Befestigte Abschnitte als [von, bis] in Laufmetern (Schellen, Kabelkanal, Verteiler), sortiert
+static func befestigte_abschnitte(l: Dictionary) -> Array:
+	var verlauf: Array = l.get("punkte", [])
 	var halt := []
-	for sp in schellen:
+	for sp in l.get("schellen", []):
 		var t := laufmeter(verlauf, sp)
 		halt.append([t, t])
 	var lauf := 0.0
@@ -181,20 +199,21 @@ func _befestigung_pruefen(l: Dictionary, r: Dictionary) -> void:
 			if not ab.is_empty():
 				halt.append([lauf + ab[0] * lg, lauf + ab[1] * lg])
 		lauf += lg
-	if halt.is_empty():
-		r.fehler.append("%s: Leitung ist nicht mit Iso-Schellen befestigt." % l.id)
-		return
 	halt.sort_custom(func(x, y): return x[0] < y[0])
-	if halt[0][0] > MAX_ENDABSTAND + 0.001 or gesamt - _max_ende(halt) > MAX_ENDABSTAND + 0.001:
-		r.fehler.append("%s: Erste/letzte Iso-Schelle mehr als %d cm vom Gerät entfernt." % [l.id, int(MAX_ENDABSTAND * 100)])
-	var bis: float = halt[0][1]
-	for h in halt:
-		if h[0] - bis > MAX_SCHELLENABSTAND + 0.001:
-			r.fehler.append("%s: Schellenabstand über %d cm." % [l.id, int(MAX_SCHELLENABSTAND * 100)])
-			break
-		bis = maxf(bis, h[1])
+	return halt
 
-func _max_ende(halt: Array) -> float:
+## Abstand (entlang der Leitung) vom Leitungsende "start"/"ende" bis zur naechsten Befestigung, INF wenn keine
+static func abstand_befestigung(l: Dictionary, ende: String) -> float:
+	var halt := befestigte_abschnitte(l)
+	if halt.is_empty():
+		return INF
+	if ende == "start":
+		return halt[0][0]
+	var m := 0.0
+	for h in halt: m = maxf(m, h[1])
+	return laenge(l) - m
+
+static func _max_ende(halt: Array) -> float:
 	var m := 0.0
 	for h in halt: m = maxf(m, h[1])
 	return m

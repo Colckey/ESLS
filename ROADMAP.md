@@ -23,6 +23,8 @@ Status: ✅ fertig · 🔧 in Arbeit · ⬜ offen
 - Rechte Maustaste ziehen = schwenken, mittlere = verschieben, Mausrad = Zoom
 - Leitung: Start-Bauteil anklicken → Eckpunkte → Ziel-Bauteil anklicken, Esc bricht ab
 - Entf löscht das ausgewählte Bauteil
+- Abmanteln, Abisolieren und Anklemmen in der 3D-Anschlussansicht (Gerät anklicken)
+- Tasten 9/0: Zollstock/Wasserwaage, R: Raster, B: Bauplan
 
 Tests: `sim_test.tscn` (Prüflogik) und `montage_test.tscn` (Montage) mit F6.
 Performancetest: `perf_test.tscn`.

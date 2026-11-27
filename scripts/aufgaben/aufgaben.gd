@@ -6,7 +6,9 @@ extends RefCounted
 
 const LISTE := [
 	{
-		"id": "ausschaltung", "titel": "Ausschaltung", "lehrjahr": 1, "stufe": "Einstieg",
+		"id": "ausschaltung",
+		"bauplan": [["fi", Vector2(-0.50, 0.17)], ["ls", Vector2(-0.45, 0.17)], ["abzweigdose", Vector2(0.10, 0.05)], ["ausschalter", Vector2(0.10, -0.25)], ["lampe", Vector2(0.40, 0.05)]],
+		"titel": "Ausschaltung", "lehrjahr": 1, "stufe": "Einstieg",
 		"kurz": "Eine Lampe mit einem Ausschalter schalten.",
 		"auftrag": "Im Kellerraum soll eine Feuchtraumleuchte mit einem Ausschalter neben der Tür geschaltet werden. Der Stromkreis wird über FI und LS B16 im Verteiler abgesichert. Die Leitungen laufen über eine Abzweigdose.",
 		"bauteile": {"fi": 1, "ls": 1, "abzweigdose": 1, "ausschalter": 1, "lampe": 1},
@@ -14,7 +16,9 @@ const LISTE := [
 		"tipps": ["Zuleitung vom LS zur Abzweigdose: NYM-J 3x1,5", "Zum Schalter reichen L hin und Schaltdraht zurück", "In der Dose: eine Wago-Klemme je Leiter (L, N, PE, Schaltdraht)"],
 	},
 	{
-		"id": "wechselschaltung", "titel": "Wechselschaltung", "lehrjahr": 1, "stufe": "Grundlagen",
+		"id": "wechselschaltung",
+		"bauplan": [["fi", Vector2(-0.50, 0.17)], ["ls", Vector2(-0.45, 0.17)], ["abzweigdose", Vector2(0.15, 0.05)], ["wechselschalter", Vector2(-0.05, -0.25)], ["wechselschalter", Vector2(0.35, -0.25)], ["lampe", Vector2(0.40, 0.20)]],
+		"titel": "Wechselschaltung", "lehrjahr": 1, "stufe": "Grundlagen",
 		"kurz": "Eine Lampe von zwei Stellen aus schalten.",
 		"auftrag": "Im Flur soll die Deckenleuchte von beiden Enden aus geschaltet werden. Setze zwei Wechselschalter und verbinde sie über die korrespondierenden Leiter.",
 		"bauteile": {"fi": 1, "ls": 1, "abzweigdose": 1, "wechselschalter": 2, "lampe": 1},
@@ -22,7 +26,9 @@ const LISTE := [
 		"tipps": ["Für drei Adern ohne Schutzleiter eignet sich NYM-O 3x1,5 oder NYM-J 5x1,5", "Die grün-gelbe Ader darf nie als korrespondierender Leiter dienen", "Jede Betätigung muss die Lampe umschalten"],
 	},
 	{
-		"id": "kreuzschaltung", "titel": "Kreuzschaltung", "lehrjahr": 1, "stufe": "Fortgeschritten",
+		"id": "kreuzschaltung",
+		"bauplan": [["fi", Vector2(-0.50, 0.17)], ["ls", Vector2(-0.45, 0.17)], ["wechselschalter", Vector2(-0.05, -0.25)], ["kreuzschalter", Vector2(0.15, -0.25)], ["wechselschalter", Vector2(0.35, -0.25)], ["lampe", Vector2(0.15, 0.15)]],
+		"titel": "Kreuzschaltung", "lehrjahr": 1, "stufe": "Fortgeschritten",
 		"kurz": "Eine Lampe von drei Stellen aus schalten.",
 		"auftrag": "Im Treppenhaus mit drei Zugängen soll eine Lampe von drei Stellen geschaltet werden: Wechselschalter, Kreuzschalter, Wechselschalter.",
 		"bauteile": {"fi": 1, "ls": 1, "wechselschalter": 2, "kreuzschalter": 1, "lampe": 1},
@@ -30,7 +36,9 @@ const LISTE := [
 		"tipps": ["Der Kreuzschalter bekommt nur korrespondierende Leiter, kein L", "Prüfe alle 8 Schalterstellungen"],
 	},
 	{
-		"id": "steckdosenkreis", "titel": "Steckdosenkreis", "lehrjahr": 1, "stufe": "Grundlagen",
+		"id": "steckdosenkreis",
+		"bauplan": [["fi", Vector2(-0.50, 0.17)], ["ls", Vector2(-0.45, 0.17)], ["steckdose", Vector2(0.00, -0.20)], ["steckdose", Vector2(0.12, -0.20)]],
+		"titel": "Steckdosenkreis", "lehrjahr": 1, "stufe": "Grundlagen",
 		"kurz": "Zwei Schutzkontakt-Steckdosen über FI anschließen.",
 		"auftrag": "In der Werkstatt sollen zwei Schuko-Steckdosen nebeneinander installiert werden. Sie bekommen einen eigenen LS B16 und müssen über den FI (30 mA) geschützt sein. Die zweite Steckdose wird von der ersten weiter verdrahtet.",
 		"bauteile": {"fi": 1, "ls": 1, "steckdose": 2},
@@ -39,7 +47,9 @@ const LISTE := [
 		"tipps": ["Üblich ist NYM-J 3x2,5 für Steckdosenkreise", "Pro Schraubklemme höchstens 2 Adern", "Schutzleiter immer mit anschließen"],
 	},
 	{
-		"id": "treppenhaus", "titel": "Treppenhausschaltung", "lehrjahr": 2, "stufe": "Steuerung",
+		"id": "treppenhaus",
+		"bauplan": [["fi", Vector2(-0.50, 0.17)], ["ls", Vector2(-0.45, 0.17)], ["treppenlicht", Vector2(-0.43, 0.17)], ["taster", Vector2(-0.05, -0.25)], ["taster", Vector2(0.15, -0.25)], ["taster", Vector2(0.35, -0.25)], ["lampe", Vector2(0.15, 0.15)]],
+		"titel": "Treppenhausschaltung", "lehrjahr": 2, "stufe": "Steuerung",
 		"kurz": "Treppenlicht mit Tastern und Treppenlichtautomat.",
 		"auftrag": "Im Mehrfamilienhaus soll das Treppenlicht von drei Etagen aus mit Tastern eingeschaltet werden. Ein Treppenlichtzeitschalter (TLZ) im Verteiler schaltet das Licht nach der Nachlaufzeit wieder aus.",
 		"bauteile": {"fi": 1, "ls": 1, "treppenlicht": 1, "taster": 3, "lampe": 1},
@@ -47,7 +57,9 @@ const LISTE := [
 		"tipps": ["Alle Taster bekommen L und schalten auf die Klemme T", "Die Lampe hängt am Ausgang „Lampe“ des TLZ", "Taster mit Leertaste drücken und wieder loslassen"],
 	},
 	{
-		"id": "schuetz", "titel": "Schützschaltung mit Selbsthaltung", "lehrjahr": 2, "stufe": "Steuerung",
+		"id": "schuetz",
+		"bauplan": [["fi", Vector2(-0.50, 0.17)], ["ls", Vector2(-0.45, 0.17)], ["schuetz", Vector2(-0.50, 0.06)], ["taster", Vector2(0.05, -0.25)], ["taster_aus", Vector2(0.20, -0.25)], ["lampe", Vector2(0.35, 0.15)]],
+		"titel": "Schützschaltung mit Selbsthaltung", "lehrjahr": 2, "stufe": "Steuerung",
 		"kurz": "Ein Schütz mit Ein- und Aus-Taster steuern.",
 		"auftrag": "Eine Maschine (hier: Lampe) wird über ein Schütz geschaltet. S1 (Schließer) schaltet ein, S0 (Öffner) schaltet aus. Das Schütz hält sich über den Hilfskontakt 13/14 selbst.",
 		"bauteile": {"fi": 1, "ls": 1, "schuetz": 1, "taster": 1, "taster_aus": 1, "lampe": 1},
@@ -55,7 +67,9 @@ const LISTE := [
 		"tipps": ["Spule A1/A2: A2 an N", "13/14 parallel zum Ein-Taster", "Hauptkontakt 1/2 schaltet die Lampe"],
 	},
 	{
-		"id": "uebungsbrett", "titel": "Übungsbrett komplett", "lehrjahr": 1, "stufe": "Abschluss",
+		"id": "uebungsbrett",
+		"bauplan": [["fi", Vector2(-0.50, 0.17)], ["ls", Vector2(-0.45, 0.17)], ["ls", Vector2(-0.43, 0.17)], ["abzweigdose", Vector2(0.30, 0.05)], ["lampe", Vector2(0.47, 0.22)], ["steckdose", Vector2(-0.18, -0.33)], ["steckdose", Vector2(-0.06, -0.33)], ["wechselschalter", Vector2(0.06, -0.33)], ["kreuzschalter", Vector2(0.18, -0.33)], ["wechselschalter", Vector2(0.30, -0.33)]],
+		"titel": "Übungsbrett komplett", "lehrjahr": 1, "stufe": "Abschluss",
 		"kurz": "Kreuzschaltung und Steckdosenkreis auf einem Brett.",
 		"auftrag": "Baue das komplette Übungsbrett wie in der Werkstatt: Die Leuchte wird über eine Abzweigdose von drei Stellen geschaltet (Wechsel-, Kreuz-, Wechselschalter, LS 1). Zwei Steckdosen bekommen einen eigenen LS (LS 2). Beide Stromkreise laufen über den FI. Die Leitungen führen durch den Kabelkanal oben.",
 		"bauteile": {"fi": 1, "ls": 2, "abzweigdose": 1, "wechselschalter": 2, "kreuzschalter": 1, "lampe": 1, "steckdose": 2},

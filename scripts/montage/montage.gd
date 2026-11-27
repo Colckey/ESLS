@@ -11,7 +11,7 @@ const BOARD_H := 0.9
 const RASTER := 0.01          # 1 cm Fangraster
 const BOHR_FANG := 0.015      # Schelle/Geraet sucht Bohrung im Umkreis von 1,5 cm
 
-enum Werkzeug { AUSWAHL, BOHRER, BAUTEIL, LEITUNG, SCHELLE, SEITENSCHNEIDER, ABMANTELN, ABISOLIEREN, ANKLEMMEN }
+enum Werkzeug { AUSWAHL, BOHRER, BAUTEIL, LEITUNG, SCHELLE, SEITENSCHNEIDER, ABMANTELN, ABISOLIEREN, ANKLEMMEN, ZOLLSTOCK, WASSERWAAGE }
 
 ## Aderfarben fuer die Darstellung
 const ADERFARBE := {
@@ -60,10 +60,12 @@ const WERKZEUG_GRUPPEN := [
 		[Werkzeug.SEITENSCHNEIDER, "Seitenschneider", "5"]]],
 	["Anschließen", [[Werkzeug.ABMANTELN, "Abmantelungswerkzeug", "6"], [Werkzeug.ABISOLIEREN, "Abisolierzange", "7"],
 		[Werkzeug.ANKLEMMEN, "Schraubendreher", "8"]]],
+	["Messen", [[Werkzeug.ZOLLSTOCK, "Zollstock (messen)", "9"], [Werkzeug.WASSERWAAGE, "Wasserwaage", "0"]]],
 ]
 const WERKZEUG_NAME := {Werkzeug.AUSWAHL: "Auswahl", Werkzeug.BOHRER: "Bohrmaschine", Werkzeug.BAUTEIL: "Bauteil setzen",
 	Werkzeug.LEITUNG: "Leitung verlegen", Werkzeug.SCHELLE: "Iso-Schelle", Werkzeug.SEITENSCHNEIDER: "Seitenschneider",
-	Werkzeug.ABMANTELN: "Abmantelungswerkzeug", Werkzeug.ABISOLIEREN: "Abisolierzange", Werkzeug.ANKLEMMEN: "Schraubendreher"}
+	Werkzeug.ABMANTELN: "Abmantelungswerkzeug", Werkzeug.ABISOLIEREN: "Abisolierzange", Werkzeug.ANKLEMMEN: "Schraubendreher",
+	Werkzeug.ZOLLSTOCK: "Zollstock", Werkzeug.WASSERWAAGE: "Wasserwaage"}
 const KUERZEL := {"fi": "fi", "ls": "ls", "abzweigdose": "dose", "ausschalter": "s", "wechselschalter": "ws",
 	"kreuzschalter": "x", "taster": "t", "taster_aus": "t0", "steckdose": "sd", "lampe": "lampe", "schuetz": "k", "zeitrelais": "kt", "treppenlicht": "tlz"}
 ## Kurze Erklaerung fuer Tooltips (Lernhilfe)
@@ -220,6 +222,7 @@ func _brett() -> void:
 	Modelle.verteiler(deko, Circuit.VERTEILER_FELD, REIHEN)
 	Modelle.einspeisung_cee(deko, Vector3(-0.50, -0.37, 0), Circuit.VERTEILER_FELD.position.y)
 	Modelle.zusammenfassen(deko)
+	_mess_knoten_anlegen()
 	bohr_knoten = Node3D.new()
 	add_child(bohr_knoten)
 	vorschau = MeshInstance3D.new()
@@ -475,7 +478,7 @@ func _auftrag_anzeigen() -> void:
 	txt += "\n[b]Tipps[/b]\n"
 	for z in a.tipps:
 		txt += "  💡 %s\n" % z
-	txt += "\n[b]Arbeitsablauf[/b]\n  1 Bohren · 2 Bauteile setzen · 3 Leitungen verlegen · 4 Iso-Schellen · 5 Abmanteln und abisolieren · 6 Anklemmen · 7 Prüfen"
+	txt += "\n[b]Arbeitsablauf[/b]\n  1 Bohren · 2 Bauteile setzen (Bauplan B, Raster R, Zollstock, Wasserwaage) · 3 Leitungen verlegen · 4 Iso-Schellen (max. 10 cm vor jedem Gerät) · 5 Abmanteln · 6 Abisolieren · 7 Anklemmen (3D-Ansicht) · 8 Prüfen"
 	t.text = txt
 	_schritte_aktualisieren()
 
@@ -487,8 +490,9 @@ func _auftrag_karte() -> Control:
 	k.add_child(v)
 	var t := RichTextLabel.new()
 	t.bbcode_enabled = true
-	t.fit_content = true
-	t.custom_minimum_size = Vector2(560, 0)
+	t.fit_content = false
+	t.scroll_active = true
+	t.custom_minimum_size = Vector2(560, 500)
 	v.add_child(t)
 	var zu := _knopf("Verstanden", func() -> void: k.hide())
 	zu.size_flags_horizontal = Control.SIZE_SHRINK_END
@@ -598,6 +602,7 @@ func aufgabe_starten(id: String) -> void:
 	startbildschirm.hide()
 	_auftrag_anzeigen()
 	auftrag_karte.visible = id != ""
+	_bauplan_zeichnen()
 
 func start_ausblenden() -> void:
 	startbildschirm.hide()
@@ -730,10 +735,18 @@ func _werkzeug_panel() -> Control:
 		grafik_knopf.text = "Grafik: hoch" if grafik_hoch else "Grafik: niedrig (schnell)")
 	grafik_knopf.tooltip_text = "Niedrig schaltet Schatten und Kantenglättung ab (für langsame PCs)"
 	v.add_child(grafik_knopf)
+	raster_knopf = _knopf("Raster (cm) einblenden", raster_umschalten)
+	raster_knopf.toggle_mode = true
+	raster_knopf.tooltip_text = "Taste R: 1-cm-Raster mit Maßzahlen vom Brettrand"
+	v.add_child(raster_knopf)
+	bauplan_knopf = _knopf("Bauplan einblenden", bauplan_umschalten)
+	bauplan_knopf.toggle_mode = true
+	bauplan_knopf.tooltip_text = "Taste B: zeigt, wo die Bauteile laut Auftrag hinkommen"
+	v.add_child(bauplan_knopf)
 	var hilfe := Label.new()
 	hilfe.theme_type_variation = "Leise"
 	hilfe.autowrap_mode = TextServer.AUTOWRAP_WORD
-	hilfe.text = "Rechte Maustaste: drehen\nMittlere Maustaste: verschieben\nMausrad: zoomen  ·  P: prüfen\nEsc: abbrechen  ·  Entf: löschen\nLeertaste: Schalter bedienen"
+	hilfe.text = "Rechte Maustaste: drehen\nMittlere Maustaste: verschieben\nMausrad: zoomen  ·  P: prüfen\nR: Raster  ·  B: Bauplan\nEsc: abbrechen  ·  Entf: löschen\nLeertaste: Schalter bedienen"
 	v.add_child(hilfe)
 	return panel
 
@@ -866,6 +879,10 @@ func _werkzeug_waehlen(w: int) -> void:
 		werkzeug_anzeige.text = BAUTEILE[bauteil_typ].name if w == Werkzeug.BAUTEIL else WERKZEUG_NAME[w]
 	verlege_start = ""
 	verlege_punkte.clear()
+	mess_start = null
+	waage_start = ""
+	if hilfs_knoten:
+		for k in hilfs_knoten.get_children(): k.queue_free()
 	match w:
 		Werkzeug.AUSWAHL: _status("Auswahl: Bauteil anklicken, Entf entfernt es.")
 		Werkzeug.BOHRER: _status("Bohrmaschine: Klick setzt eine 6-mm-Bohrung.")
@@ -873,9 +890,11 @@ func _werkzeug_waehlen(w: int) -> void:
 		Werkzeug.LEITUNG: _status("%s: Start-Bauteil anklicken, Eckpunkte setzen, Ziel-Bauteil anklicken. Esc bricht ab." % leitung_typ)
 		Werkzeug.SCHELLE: _status("Iso-Schelle: Auf die Leitung über einer Bohrung klicken (max. 25 cm Abstand).")
 		Werkzeug.SEITENSCHNEIDER: _status("Seitenschneider: Leitung anklicken, um sie zu entfernen.")
-		Werkzeug.ABMANTELN: _status("Abmantelungswerkzeug: Bauteil anklicken. Jeder Klick mantelt die nächste Leitung dort ab.")
-		Werkzeug.ANKLEMMEN: _status("Schraubendreher: Bauteil anklicken, um es in der Nahansicht anzuklemmen.")
-		Werkzeug.ABISOLIEREN: _status("Abisolierzange (%d mm): Bauteil anklicken. Jeder Klick isoliert die Adern der nächsten Leitung ab. Richtig sind 8 bis 12 mm." % abisolier_mm)
+		Werkzeug.ABMANTELN: _status("Abmantelungswerkzeug: Bauteil anklicken, an dem die Leitung endet. In der 3D-Ansicht dann den grauen Mantel anklicken. Vorher muss eine Iso-Schelle höchstens 10 cm vor dem Gerät sitzen.")
+		Werkzeug.ANKLEMMEN: _status("Schraubendreher: Bauteil anklicken. In der 3D-Ansicht erst die Ader, dann die Klemme anklicken.")
+		Werkzeug.ABISOLIEREN: _status("Abisolierzange (%d mm): Bauteil anklicken. In der 3D-Ansicht jede Ader einzeln anklicken. Richtig sind 8 bis 12 mm." % abisolier_mm)
+		Werkzeug.ZOLLSTOCK: _status("Zollstock: Startpunkt anklicken, dann Endpunkt. Angezeigt wird der Abstand in cm.")
+		Werkzeug.WASSERWAAGE: _status("Wasserwaage: zwei Bauteile nacheinander anklicken. Die Waage zeigt, ob sie genau waagerecht oder senkrecht zueinander sitzen.")
 
 # ---------------------------------------------------------------- Eingabe
 
@@ -905,6 +924,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 		if p != null:
 			cursor_marker.position = p
 			_vorschau_zeichnen(p)
+			_messen_bewegung(p)
+			_hilfslinien(p)
 	elif ev is InputEventMouseButton and ev.pressed:
 		var mb := ev as InputEventMouseButton
 		get_viewport().gui_release_focus()   # Namensfeld/Auswahllisten loslassen
@@ -925,7 +946,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 			verlege_punkte.clear()
 			_vorschau_zeichnen(Vector3.ZERO)
 			_status("Abgebrochen.")
-		elif k.keycode >= KEY_1 and k.keycode <= KEY_8:
+		elif k.keycode >= KEY_0 and k.keycode <= KEY_9:
 			var nr := str(k.keycode - KEY_0)
 			for gruppe in WERKZEUG_GRUPPEN:
 				for w in gruppe[1]:
@@ -933,6 +954,10 @@ func _unhandled_input(ev: InputEvent) -> void:
 						_werkzeug_waehlen(w[0])
 		elif k.keycode == KEY_P:
 			_pruefen()
+		elif k.keycode == KEY_R:
+			raster_umschalten()
+		elif k.keycode == KEY_B:
+			bauplan_umschalten()
 		elif k.keycode == KEY_HOME:
 			_ansicht_zuruecksetzen()
 		elif k.keycode == KEY_DELETE and ausgewaehlt != "":
@@ -953,9 +978,11 @@ func _klick(p: Vector3) -> void:
 		Werkzeug.LEITUNG: _leitung_klick(p)
 		Werkzeug.SCHELLE: _schelle_setzen(p)
 		Werkzeug.SEITENSCHNEIDER: _leitung_schneiden(p)
-		Werkzeug.ABMANTELN: _abmanteln(p)
-		Werkzeug.ABISOLIEREN: _abisolieren(p)
-		Werkzeug.ANKLEMMEN: _nahansicht_oeffnen(_geraet_bei(p))
+		Werkzeug.ABMANTELN: _nahansicht_oeffnen(_geraet_bei(p), Nahansicht.Modus.ABMANTELN)
+		Werkzeug.ABISOLIEREN: _nahansicht_oeffnen(_geraet_bei(p), Nahansicht.Modus.ABISOLIEREN)
+		Werkzeug.ANKLEMMEN: _nahansicht_oeffnen(_geraet_bei(p), Nahansicht.Modus.ANKLEMMEN)
+		Werkzeug.ZOLLSTOCK: _messen_klick(p)
+		Werkzeug.WASSERWAAGE: _wasserwaage_klick(p)
 
 # ---------------------------------------------------------------- Werkzeuge
 
@@ -1119,7 +1146,7 @@ func _leitung_anlegen(von: String, nach: String, punkte: Array) -> void:
 	}
 	circuit.leitung_hinzufuegen(l)
 	_leitung_zeichnen(l)
-	_status("%s (%s) von %s nach %s verlegt, %.2f m. Jetzt mit Iso-Schellen befestigen." % [l.id, leitung_typ, von, nach, _laenge(punkte)])
+	_status("%s (%s) von %s nach %s verlegt, %.2f m. Jetzt mit Iso-Schellen befestigen (höchstens 10 cm vor jedem Gerät, dazwischen höchstens 25 cm), danach abmanteln." % [l.id, leitung_typ, von, nach, _laenge(punkte)])
 
 func _leitung_mit_id(id: String) -> Variant:
 	for l in circuit.leitungen:
@@ -1172,7 +1199,25 @@ func _schelle_setzen(p: Vector3) -> void:
 	l.schellen.sort_custom(func(x: Vector3, y: Vector3) -> bool:
 		return _laufmeter(l, x) < _laufmeter(l, y))
 	_leitung_zeichnen(l)
-	_status("Schelle an %s gesetzt (%d Schellen)." % [l.id, l.schellen.size()])
+	_status("Schelle an %s gesetzt (%d Schellen). %s" % [l.id, l.schellen.size(), _befestigung_text(l)])
+
+## Kurzer Hinweis, was an der Befestigung einer Leitung noch fehlt
+func _befestigung_text(l: Dictionary) -> String:
+	var fehlt := []
+	for e in [["start", l.start_geraet], ["ende", l.ende_geraet]]:
+		var d := Circuit.abstand_befestigung(l, e[0])
+		if d > Circuit.MAX_ENDABSTAND + 0.001:
+			fehlt.append("vor %s fehlt eine Schelle (max. 10 cm)" % e[1])
+	var halt := Circuit.befestigte_abschnitte(l)
+	var bis: float = halt[0][1] if not halt.is_empty() else 0.0
+	for h in halt:
+		if h[0] - bis > Circuit.MAX_SCHELLENABSTAND + 0.001:
+			fehlt.append("Lücke über 25 cm")
+			break
+		bis = maxf(bis, h[1])
+	if fehlt.is_empty():
+		return "Leitung fertig befestigt, jetzt abmanteln."
+	return "Noch: " + ", ".join(fehlt) + "."
 
 func _laufmeter(l: Dictionary, p: Vector3) -> float:
 	var lauf := 0.0
@@ -1222,6 +1267,9 @@ func _abmanteln(p: Vector3) -> void:
 	for e in _leitungsenden_am_geraet(id):
 		var l: Dictionary = e[0]
 		if not l.abgemantelt[e[1]]:
+			if Circuit.abstand_befestigung(l, e[1]) > Circuit.MAX_ENDABSTAND + 0.001:
+				_status("%s ist vor %s nicht befestigt. Erst eine Iso-Schelle höchstens 10 cm vor dem Gerät setzen." % [l.id, id])
+				continue
 			l.abgemantelt[e[1]] = true
 			_leitung_zeichnen(l)
 			_status("%s an %s abgemantelt. Jetzt die Adern abisolieren." % [l.id, id])
@@ -1262,9 +1310,9 @@ func _abisolieren(p: Vector3) -> void:
 
 var nahansicht: Nahansicht
 
-func _nahansicht_oeffnen(id: String) -> void:
+func _nahansicht_oeffnen(id: String, modus := -1) -> void:
 	if id == "":
-		_status("Kein Bauteil angeklickt.")
+		_status("Bauteil anklicken, an dem die Leitung endet.")
 		return
 	cam_target = circuit.geraete[id].pos + Vector3(0.12, 0, 0)
 	cam_dist = 0.35
@@ -1283,6 +1331,8 @@ func _nahansicht_oeffnen(id: String) -> void:
 	nahansicht.offset_right = -10
 	nahansicht.offset_left = -10 - nahansicht.custom_minimum_size.x
 	nahansicht.offset_top = maxf(kopfleiste.size.y, 50) + 8
+	if modus >= 0:
+		nahansicht.modus = modus
 	nahansicht.oeffnen(id)
 
 ## Wird von der Nahansicht nach jeder Aenderung aufgerufen
@@ -1385,6 +1435,7 @@ func _datei_gewaehlt(pfad: String) -> void:
 		_geprueft = false
 		_alles_neu_zeichnen()
 		_auftrag_anzeigen()
+		_bauplan_zeichnen()
 		_ergebnis_setzen("" if d.unveraendert else "[color=#d35400]Hinweis: Datei wurde außerhalb von ESLS verändert.[/color]")
 		_status("Geladen: %s" % pfad)
 
@@ -1465,13 +1516,21 @@ func _leitung_zeichnen(l: Dictionary) -> void:
 		add_child(knoten)
 		leitung_knoten[l.id] = knoten
 		return
-	tube.mesh = _rohr(l.punkte, r)
+	# Abgemantelte Enden: Mantel endet 3 cm vor dem Geraeterand, davor sieht man die bunten Adern
+	var gesamt := _laenge(l.punkte)
+	var schnitt := {}
+	for ende in ["start", "ende"]:
+		schnitt[ende] = 0.0
+		if l.abgemantelt.get(ende, false):
+			schnitt[ende] = minf(_rand_lauf(l, ende) + MANTEL_VOR_RAND, gesamt / 2 - 0.005)
+	tube.mesh = _rohr(_teilstueck(l.punkte, schnitt.start, gesamt - schnitt.ende), r)
 	tube.material_override = mat_steuer if String(l.typ).begins_with("Steuer") else mat_nym
 	knoten.add_child(tube)
 	for s in l.schellen:
 		Modelle.rohrschelle(knoten, s, r, _senkrecht_bei(l.punkte, s))
-	_adern_zeichnen(knoten, l, "start", r)
-	_adern_zeichnen(knoten, l, "ende", r)
+	for ende in ["start", "ende"]:
+		if l.abgemantelt.get(ende, false):
+			_adern_zeichnen(knoten, l, ende, r, schnitt[ende])
 	Modelle.zusammenfassen(knoten)
 	add_child(knoten)
 	leitung_knoten[l.id] = knoten
@@ -1489,35 +1548,86 @@ func _senkrecht_bei(pts: Array, p: Vector3) -> bool:
 			senk = absf(b.y - a.y) > absf(b.x - a.x)
 	return senk
 
-## Abgemanteltes Ende: Adern faechern 4 cm vor dem Geraet auf, abisolierte Spitzen in Kupfer
-func _adern_zeichnen(knoten: Node3D, l: Dictionary, ende: String, r: float) -> void:
-	if not l.abgemantelt.get(ende, false):
-		return
-	var pts: Array = l.punkte
+const MANTEL_VOR_RAND := 0.03   # so viel Mantel wird vor dem Geraet entfernt (sichtbare Adern)
+
+## Laufmeter vom Leitungsende bis zum Rand des Geraets (dort tritt die Leitung ins Geraet ein)
+func _rand_lauf(l: Dictionary, ende: String) -> float:
+	var id: String = l.start_geraet if ende == "start" else l.ende_geraet
+	var g: Dictionary = circuit.geraete.get(id, {})
+	if g.is_empty() or not BAUTEILE.has(g.typ):
+		return 0.0
+	var gr: Vector3 = BAUTEILE[g.typ].groesse
+	var mitte: Vector3 = g.pos
+	var feld := Rect2(mitte.x - gr.x / 2, mitte.y - gr.y / 2, gr.x, gr.y)
+	var pts: Array = l.punkte.duplicate()
+	if ende == "ende":
+		pts.reverse()
+	var lauf := 0.0
+	for i in range(pts.size() - 1):
+		var a: Vector3 = pts[i]
+		var b: Vector3 = pts[i + 1]
+		var t := Circuit._im_rechteck(Vector2(a.x, a.y), Vector2(b.x, b.y), feld)
+		if t.is_empty() or t[0] > 0.0001:
+			return lauf   # Segment beginnt schon ausserhalb
+		if t[1] < 0.9999:
+			return lauf + a.distance_to(b) * t[1]
+		lauf += a.distance_to(b)
+	return lauf
+
+## Punkt und Richtung bei Laufmeter s
+func _punkt_bei(pts: Array, s: float) -> Array:
+	var lauf := 0.0
+	for i in range(pts.size() - 1):
+		var a: Vector3 = pts[i]
+		var b: Vector3 = pts[i + 1]
+		var d := a.distance_to(b)
+		if lauf + d >= s or i == pts.size() - 2:
+			var t := clampf((s - lauf) / maxf(d, 1e-6), 0.0, 1.0)
+			return [a.lerp(b, t), (b - a).normalized()]
+		lauf += d
+	return [pts[0], Vector3.RIGHT]
+
+## Teil der Leitung zwischen den Laufmetern von und bis
+func _teilstueck(pts: Array, von: float, bis: float) -> Array:
+	if von <= 0.0 and bis >= _laenge(pts) - 0.0001:
+		return pts
+	var aus := [_punkt_bei(pts, von)[0]]
+	var lauf := 0.0
+	for i in range(pts.size() - 1):
+		lauf += (pts[i] as Vector3).distance_to(pts[i + 1])
+		if lauf > von and lauf < bis:
+			aus.append(pts[i + 1])
+	aus.append(_punkt_bei(pts, bis)[0])
+	return aus
+
+## Abgemanteltes Ende: die Adern laufen einzeln (in ihren Farben) vom Mantelende bis ins Geraet
+func _adern_zeichnen(knoten: Node3D, l: Dictionary, ende: String, r: float, schnitt: float) -> void:
+	var pts: Array = l.punkte.duplicate()
 	if pts.size() < 2:
 		return
-	var spitze: Vector3 = pts[0] if ende == "start" else pts[pts.size() - 1]
-	var davor: Vector3 = pts[1] if ende == "start" else pts[pts.size() - 2]
-	var dir := (spitze - davor).normalized()
+	if ende == "ende":
+		pts.reverse()
+	var rand := _rand_lauf(l, ende)
+	var p_mantel: Array = _punkt_bei(pts, schnitt)
+	var p_rand: Array = _punkt_bei(pts, maxf(rand - 0.012, 0.0))
+	var dir: Vector3 = -(p_mantel[1] as Vector3)   # Richtung zum Geraet
 	var seite := dir.cross(Vector3(0, 0, 1)).normalized()
-	var feld := "abisoliert_von" if ende == "start" else "abisoliert_nach"
 	var n: int = l.adern.size()
-	var kupfer := Modelle.mat(Color(0.85, 0.5, 0.25), 0.3, 0.5)
 	for i in range(n):
 		var a: Dictionary = l.adern[i]
-		var versatz := seite * (float(i) - (n - 1) / 2.0) * 0.006
-		var von := spitze - dir * 0.05 + Vector3(0, 0, r)
-		var bis := spitze - dir * 0.012 + versatz + Vector3(0, 0, r + 0.004)
+		var versatz := seite * (float(i) - (n - 1) / 2.0) * 0.0042
+		var von: Vector3 = p_mantel[0] + Vector3(0, 0, r)
+		var mitte: Vector3 = von.lerp(p_rand[0] + Vector3(0, 0, r), 0.45) + versatz
+		var bis: Vector3 = p_rand[0] + versatz * 1.3 + Vector3(0, 0, r + 0.002)
 		var mi := MeshInstance3D.new()
-		mi.mesh = _rohr([von, bis], 0.0014)
+		mi.mesh = _rohr([von, mitte, bis], 0.0016)
 		mi.material_override = Modelle.mat(ADERFARBE.get(a.farbe, Color.BLACK), 0.5)
 		knoten.add_child(mi)
-		var mm: float = a.get(feld, 0.0)
-		if mm > 0.0:
-			var cu := MeshInstance3D.new()
-			cu.mesh = _rohr([bis, bis + dir * mm / 1000.0], 0.0009)
-			cu.material_override = kupfer
-			knoten.add_child(cu)
+	# Mantelkante etwas heller (Schnittkante)
+	var kante := MeshInstance3D.new()
+	kante.mesh = _rohr([p_mantel[0] - dir * 0.001, p_mantel[0] + dir * 0.0015], r * 1.04)
+	kante.material_override = Modelle.mat(Color(0.97, 0.97, 0.95), 0.6)
+	knoten.add_child(kante)
 
 ## Rohr entlang der Punkte (auf dem Brett aufliegend)
 func _rohr(punkte: Array, r: float) -> ArrayMesh:
@@ -1562,3 +1672,275 @@ func musterbrett_zeigen() -> void:
 
 func ergebnis_zeigen() -> void:
 	ergebnis_karte.show()
+
+# ---------------------------------------------------------------- Messen, Raster, Bauplan
+
+var raster_knoten: Node3D
+var bauplan_knoten: Node3D
+var mess_knoten: Node3D
+var waage_knoten: Node3D
+var hilfs_knoten: Node3D
+var mess_start: Variant = null
+var waage_start := ""
+var raster_an := false
+var bauplan_an := false
+var raster_knopf: Button
+var bauplan_knopf: Button
+
+func _mess_knoten_anlegen() -> void:
+	raster_knoten = Node3D.new()
+	raster_knoten.visible = false
+	add_child(raster_knoten)
+	bauplan_knoten = Node3D.new()
+	add_child(bauplan_knoten)
+	mess_knoten = Node3D.new()
+	add_child(mess_knoten)
+	waage_knoten = Node3D.new()
+	add_child(waage_knoten)
+	hilfs_knoten = Node3D.new()
+	add_child(hilfs_knoten)
+	_raster_bauen()
+
+static func _unbeleuchtet(c: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = c
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	if c.a < 1.0:
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	return m
+
+## Linien als flache Streifen in der Brettebene: [[a, b], ...]
+func _linien(p: Node3D, linien: Array, breite: float, m: Material, z := 0.0008) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for li in linien:
+		var a: Vector3 = li[0]
+		var b: Vector3 = li[1]
+		var d := (b - a).normalized()
+		var q := Vector3(-d.y, d.x, 0) * breite / 2
+		var oz := Vector3(0, 0, z)
+		for v in [a - q, b - q, b + q, a - q, b + q, a + q]:
+			st.set_normal(Vector3(0, 0, 1))
+			st.add_vertex(v + oz)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = m
+	p.add_child(mi)
+
+func _text3d(p: Node3D, t: String, pos: Vector3, groesse := 22, farbe := Color(0.1, 0.2, 0.45)) -> Label3D:
+	var l := Label3D.new()
+	l.text = t
+	l.font_size = groesse
+	l.pixel_size = 0.0005
+	l.modulate = farbe
+	l.outline_size = 6
+	l.outline_modulate = Color(1, 1, 1, 0.85)
+	l.position = pos
+	l.no_depth_test = true
+	l.render_priority = 2
+	p.add_child(l)
+	return l
+
+## Raster: 1-cm-, 5-cm- und 10-cm-Linien, Massangaben vom linken und oberen Brettrand
+func _raster_bauen() -> void:
+	var fein := []
+	var mittel := []
+	var grob := []
+	var links := -BOARD_W / 2
+	var oben := BOARD_H / 2
+	for i in range(int(BOARD_W * 100) + 1):
+		var x := links + i * 0.01
+		var li := [Vector3(x, -BOARD_H / 2, 0), Vector3(x, BOARD_H / 2, 0)]
+		if i % 10 == 0: grob.append(li)
+		elif i % 5 == 0: mittel.append(li)
+		else: fein.append(li)
+	for i in range(int(BOARD_H * 100) + 1):
+		var y := oben - i * 0.01
+		var li := [Vector3(-BOARD_W / 2, y, 0), Vector3(BOARD_W / 2, y, 0)]
+		if i % 10 == 0: grob.append(li)
+		elif i % 5 == 0: mittel.append(li)
+		else: fein.append(li)
+	_linien(raster_knoten, fein, 0.0006, _unbeleuchtet(Color(0.1, 0.25, 0.6, 0.18)), 0.0009)
+	_linien(raster_knoten, mittel, 0.0009, _unbeleuchtet(Color(0.1, 0.25, 0.6, 0.35)), 0.001)
+	_linien(raster_knoten, grob, 0.0014, _unbeleuchtet(Color(0.1, 0.25, 0.6, 0.6)), 0.0011)
+	for i in range(0, int(BOARD_W * 100) + 1, 10):
+		_text3d(raster_knoten, str(i), Vector3(links + i * 0.01, oben - 0.012, 0.08), 32)
+	for i in range(10, int(BOARD_H * 100) + 1, 10):
+		_text3d(raster_knoten, str(i), Vector3(links + 0.012, oben - i * 0.01, 0.08), 32)
+
+func raster_umschalten() -> void:
+	raster_an = not raster_an
+	raster_knoten.visible = raster_an
+	if raster_knopf: raster_knopf.button_pressed = raster_an
+	_status("Raster %s: feine Linien 1 cm, kräftig 10 cm. Zahlen = cm vom linken bzw. oberen Brettrand." % ("an" if raster_an else "aus"))
+
+## Bauplan: wo die Bauteile laut Auftrag hinkommen (durchsichtige Umrisse)
+func bauplan_umschalten() -> void:
+	var a := Aufgaben.finden(aufgabe_id)
+	if not a.has("bauplan"):
+		_status("Für diesen Auftrag gibt es keinen Bauplan.")
+		bauplan_an = false
+	else:
+		bauplan_an = not bauplan_an
+	if bauplan_knopf: bauplan_knopf.button_pressed = bauplan_an
+	_bauplan_zeichnen()
+
+func _bauplan_zeichnen() -> void:
+	for k in bauplan_knoten.get_children():
+		k.queue_free()
+	var a := Aufgaben.finden(aufgabe_id)
+	if not a.has("bauplan"):
+		bauplan_an = false
+		if bauplan_knopf: bauplan_knopf.button_pressed = false
+	if not bauplan_an:
+		return
+	var flaeche := _unbeleuchtet(Color(0.15, 0.45, 1.0, 0.18))
+	var rand := _unbeleuchtet(Color(0.1, 0.35, 0.9, 0.85))
+	for b in a.bauplan:
+		var typ: String = b[0]
+		var p := Vector3(b[1].x, b[1].y, 0)
+		var g: Vector3 = BAUTEILE[typ].groesse
+		var h := Vector3(g.x / 2, 0, 0)
+		var v := Vector3(0, g.y / 2, 0)
+		_linien(bauplan_knoten, [[p - h, p + h]], g.y, flaeche, 0.0012)
+		_linien(bauplan_knoten, [[p - h - v, p + h - v], [p - h + v, p + h + v], [p - h - v, p - h + v], [p + h - v, p + h + v]], 0.0015, rand, 0.0013)
+		var von_links := int(round((p.x + BOARD_W / 2) * 100))
+		var von_oben := int(round((BOARD_H / 2 - p.y) * 100))
+		if not typ in HUTSCHIENE:
+			_text3d(bauplan_knoten, "%s\n%d | %d cm" % [KACHEL_NAME.get(typ, BAUTEILE[typ].name), von_links, von_oben], p + Vector3(0, 0, 0.002), 26)
+	_status("Bauplan an: blaue Umrisse zeigen, wo die Bauteile hinkommen (Mitte: cm von links | cm von oben).")
+
+# ---- Zollstock
+
+func _messen_klick(p: Vector3) -> void:
+	if mess_start == null:
+		mess_start = p
+		_zollstock_zeichnen(p, p)
+		_status("Zollstock: Startpunkt gesetzt. Jetzt den Endpunkt anklicken.")
+		return
+	var a: Vector3 = mess_start
+	mess_start = null
+	_zollstock_zeichnen(a, p)
+	var d := a.distance_to(p)
+	_status("Gemessen: %s cm  (waagerecht %s cm, senkrecht %s cm). Nächster Klick misst neu." % [_cm(d), _cm(absf(p.x - a.x)), _cm(absf(p.y - a.y))])
+
+func _cm(m: float) -> String:
+	return ("%.1f" % (m * 100)).replace(".", ",")
+
+## Gelber Zollstock mit cm-Strichen vom Start- zum Endpunkt
+func _zollstock_zeichnen(a: Vector3, b: Vector3) -> void:
+	for k in mess_knoten.get_children():
+		k.queue_free()
+	var z := 0.075
+	var marke := _unbeleuchtet(Color(0.9, 0.15, 0.1))
+	for q in [a, b]:
+		_linien(mess_knoten, [[q - Vector3(0.008, 0, 0), q + Vector3(0.008, 0, 0)], [q - Vector3(0, 0.008, 0), q + Vector3(0, 0.008, 0)]], 0.0015, marke, z + 0.002)
+	var d := a.distance_to(b)
+	if d < 0.005:
+		return
+	var dir := (b - a).normalized()
+	var quer := Vector3(-dir.y, dir.x, 0)
+	_linien(mess_knoten, [[a, b]], 0.018, _unbeleuchtet(Color(0.98, 0.82, 0.15, 0.92)), z)
+	var striche := []
+	for i in range(int(d * 100) + 1):
+		var p := a + dir * i * 0.01
+		var lang := 0.009 if i % 10 == 0 else (0.006 if i % 5 == 0 else 0.0035)
+		striche.append([p + quer * 0.009, p + quer * (0.009 - lang)])
+		if i % 10 == 0 and i > 0:
+			_text3d(mess_knoten, str(i), p - quer * 0.003 + Vector3(0, 0, z), 18, Color(0.1, 0.1, 0.1))
+	_linien(mess_knoten, striche, 0.0008, _unbeleuchtet(Color(0.1, 0.1, 0.1)), z + 0.001)
+	var mitte := (a + b) / 2 + quer * 0.03 + Vector3(0, 0, z)
+	_text3d(mess_knoten, "%s cm" % _cm(d), mitte, 34, Color(0.75, 0.1, 0.05))
+
+func _messen_bewegung(p: Vector3) -> void:
+	if werkzeug == Werkzeug.ZOLLSTOCK and mess_start != null:
+		_zollstock_zeichnen(mess_start, p)
+		_status("Zollstock: %s cm  (waagerecht %s, senkrecht %s)" % [_cm((mess_start as Vector3).distance_to(p)), _cm(absf(p.x - mess_start.x)), _cm(absf(p.y - mess_start.y))])
+
+# ---- Wasserwaage
+
+func _wasserwaage_klick(p: Vector3) -> void:
+	var id := _geraet_bei(p)
+	if id == "":
+		_status("Wasserwaage: ein Bauteil anklicken, dann ein zweites. Die Waage zeigt, ob beide genau in einer Flucht sitzen.")
+		return
+	if waage_start == "" or waage_start == id:
+		waage_start = id
+		for k in waage_knoten.get_children(): k.queue_free()
+		_status("Wasserwaage an %s angelegt. Jetzt das zweite Bauteil anklicken." % id)
+		return
+	var a: Vector3 = circuit.geraete[waage_start].pos
+	var b: Vector3 = circuit.geraete[id].pos
+	var ergebnis := _wasserwaage_zeichnen(a, b)
+	_status("Wasserwaage %s – %s: %s" % [waage_start, id, ergebnis])
+	waage_start = ""
+
+## Waage zwischen zwei Punkten; Rueckgabe: Text mit dem Ergebnis
+func _wasserwaage_zeichnen(a: Vector3, b: Vector3) -> String:
+	for k in waage_knoten.get_children():
+		k.queue_free()
+	var waagerecht := absf(b.x - a.x) >= absf(b.y - a.y)
+	var laenge := maxf(absf(b.x - a.x) if waagerecht else absf(b.y - a.y), 0.2) + 0.06
+	var versatz := (b.y - a.y) if waagerecht else (b.x - a.x)
+	var mitte := (a + b) / 2
+	var z := 0.08
+	var n := Node3D.new()
+	n.position = Vector3(mitte.x, mitte.y, z)
+	n.rotation.z = 0.0 if waagerecht else PI / 2
+	waage_knoten.add_child(n)
+	Modelle.box(n, Vector3(laenge, 0.028, 0.012), Vector3.ZERO, Modelle.mat(Color(0.80, 0.82, 0.85), 0.3, 0.7))
+	Modelle.box(n, Vector3(laenge, 0.006, 0.0125), Vector3(0, 0.011, 0.0005), Modelle.mat(Color(0.2, 0.35, 0.75), 0.5))
+	Modelle.box(n, Vector3(0.05, 0.016, 0.004), Vector3(0, -0.002, 0.007), Modelle.mat(Color(0.75, 0.95, 0.3, 0.75), 0.1))
+	for s in [-0.011, 0.011]:
+		Modelle.box(n, Vector3(0.0012, 0.016, 0.001), Vector3(s, -0.002, 0.0095), Modelle.mat(Color(0.1, 0.1, 0.1), 0.5))
+	var schief := absf(versatz) > 0.0005
+	var blase := clampf(versatz * 4.0, -0.018, 0.018)
+	if not waagerecht:
+		blase = -blase
+	Modelle.zyl(n, 0.0045, 0.002, Vector3(blase, -0.002, 0.0095), Modelle.mat(Color(1, 1, 0.9), 0.1), 12)
+	var text := ""
+	if not schief:
+		text = "✔ genau %s" % ("waagerecht" if waagerecht else "senkrecht (lotrecht)")
+	else:
+		text = "✘ %s cm %s versetzt" % [_cm(absf(versatz)), "in der Höhe" if waagerecht else "zur Seite"]
+	_text3d(waage_knoten, text, Vector3(mitte.x, mitte.y, z) + (Vector3(0, 0.035, 0.01) if waagerecht else Vector3(0.05, 0, 0.01)), 30,
+		Color(0.1, 0.5, 0.2) if not schief else Color(0.75, 0.1, 0.05))
+	return text
+
+# ---- Hilfslinien beim Setzen
+
+## Beim Bauteil-Setzen: Umriss an der Mausposition und Fluchtlinien zu anderen Bauteilen
+func _hilfslinien(p: Vector3) -> void:
+	for k in hilfs_knoten.get_children():
+		k.queue_free()
+	if werkzeug != Werkzeug.BAUTEIL:
+		return
+	var g: Vector3 = BAUTEILE[bauteil_typ].groesse
+	if bauteil_typ in HUTSCHIENE:
+		if not Circuit.VERTEILER_FELD.has_point(Vector2(p.x, p.y)):
+			return
+		var beste: float = REIHEN[0]
+		for y in REIHEN:
+			if absf(y - p.y) < absf(beste - p.y): beste = y
+		p.y = beste
+	var h := Vector3(g.x / 2, 0, 0)
+	var v := Vector3(0, g.y / 2, 0)
+	var m := _unbeleuchtet(Color(0.1, 0.45, 1.0, 0.9))
+	_linien(hilfs_knoten, [[p - h - v, p + h - v], [p - h + v, p + h + v], [p - h - v, p - h + v], [p + h - v, p + h + v]], 0.0018, m, 0.07)
+	var flucht := []
+	var namen := []
+	for id in circuit.geraete:
+		var o: Dictionary = circuit.geraete[id]
+		if not BAUTEILE.has(o.typ) or o.typ in ["einspeisung", "n_schiene", "pe_schiene"]:
+			continue
+		var op: Vector3 = o.pos
+		if absf(op.y - p.y) < 0.004:
+			flucht.append([Vector3(minf(op.x, p.x), p.y, 0), Vector3(maxf(op.x, p.x), p.y, 0)])
+			namen.append("%s (gleiche Höhe, %s cm Abstand)" % [id, _cm(absf(op.x - p.x))])
+		if absf(op.x - p.x) < 0.004:
+			flucht.append([Vector3(p.x, minf(op.y, p.y), 0), Vector3(p.x, maxf(op.y, p.y), 0)])
+			namen.append("%s (senkrecht darüber/darunter)" % id)
+	if not flucht.is_empty():
+		_linien(hilfs_knoten, flucht, 0.0012, _unbeleuchtet(Color(0.95, 0.35, 0.1, 0.9)), 0.07)
+		_status("%s setzen – fluchtet mit %s" % [BAUTEILE[bauteil_typ].name, ", ".join(namen)])

@@ -1,7 +1,9 @@
 class_name Nahansicht
 extends PanelContainer
-## Nahansicht zum Anklemmen. Links: Leitungsenden mit ihren Adern. Rechts: Klemmen.
-## Ader anklicken, dann Klemme anklicken = anklemmen. Ader anklicken, dann "Lösen" = abklemmen.
+## Nahansicht zum Anschliessen, mit 3D-Ansicht des geoeffneten Geraets (Anschluss3D).
+## Reihenfolge wie in der Werkstatt: 1. Abmanteln (nur wenn die Leitung befestigt ist),
+## 2. jede Ader abisolieren, 3. Ader anklicken und in die Klemme stecken.
+## Ader anklicken, dann "Lösen" = abklemmen. Unter "Liste" gibt es dieselben Schritte als Text.
 ## Im Verteiler (Einspeisung, FI, LS) sieht man alle Verteilergeraete und kann
 ## Bruecken mit H07V-K-Einzeladern legen. In der Abzweigdose setzt man Verbindungsklemmen.
 
@@ -15,6 +17,12 @@ var gruppe: Array = []
 ## Auswahl: {"art": "ader", "leitung": Dictionary, "index": int, "feld": "von"/"nach"} oder {"art": "klemme", "klemme": String}
 var auswahl := {}
 var bruecken_farbe := "bn"
+enum Modus { ABMANTELN, ABISOLIEREN, ANKLEMMEN }
+var modus: int = Modus.ANKLEMMEN
+
+var ansicht3d: Anschluss3D
+var _liste: Control
+var _modus_knoepfe := {}
 
 var _titel: Label
 var _hinweis: Label
@@ -24,7 +32,7 @@ var _extra: HBoxContainer
 
 func _ready() -> void:
 	position = Vector2(560, 90)
-	custom_minimum_size = Vector2(700, 560)
+	custom_minimum_size = Vector2(840, 0)
 	add_theme_stylebox_override("panel", Stil.box(Stil.HINTERGRUND, 10, Stil.AKZENT.darkened(0.3), 1, Vector2(14, 12)))
 	var v := VBoxContainer.new()
 	add_child(v)
@@ -34,6 +42,15 @@ func _ready() -> void:
 	_titel.theme_type_variation = "Titel"
 	_titel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	kopf.add_child(_titel)
+	var liste_knopf := Button.new()
+	liste_knopf.text = "Liste"
+	liste_knopf.toggle_mode = true
+	liste_knopf.focus_mode = Control.FOCUS_NONE
+	liste_knopf.tooltip_text = "Statt der 3D-Ansicht eine Liste der Adern und Klemmen zeigen"
+	liste_knopf.toggled.connect(func(an: bool) -> void:
+		_liste.visible = an
+		ansicht3d.visible = not an)
+	kopf.add_child(liste_knopf)
 	var zu := Button.new()
 	zu.text = "Schließen"
 	zu.pressed.connect(func() -> void: hide())
@@ -41,16 +58,45 @@ func _ready() -> void:
 	_hinweis = Label.new()
 	_hinweis.theme_type_variation = "Leise"
 	_hinweis.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_hinweis.custom_minimum_size = Vector2(670, 40)
+	_hinweis.custom_minimum_size = Vector2(810, 40)
 	v.add_child(_hinweis)
+	# Arbeitsschritte in der Nahansicht
+	var schritte := HBoxContainer.new()
+	schritte.add_theme_constant_override("separation", 6)
+	v.add_child(schritte)
+	for m in [[Modus.ABMANTELN, "① Abmanteln"], [Modus.ABISOLIEREN, "② Abisolieren"], [Modus.ANKLEMMEN, "③ Anklemmen"]]:
+		var b := Button.new()
+		b.text = m[1]
+		b.toggle_mode = true
+		b.focus_mode = Control.FOCUS_NONE
+		b.pressed.connect(modus_setzen.bind(m[0]))
+		schritte.add_child(b)
+		_modus_knoepfe[m[0]] = b
+	var mm := SpinBox.new()
+	mm.min_value = 2
+	mm.max_value = 30
+	mm.suffix = "mm"
+	mm.tooltip_text = "Abisolierlänge (richtig: 8 bis 12 mm)"
+	mm.value = montage.abisolier_mm
+	mm.value_changed.connect(func(w: float) -> void:
+		montage.abisolier_mm = w
+		if modus == Modus.ABISOLIEREN: modus_setzen(modus))
+	schritte.add_child(mm)
 	_extra = HBoxContainer.new()
-	v.add_child(_extra)
+	schritte.add_child(_extra)
+	ansicht3d = Anschluss3D.new()
+	ansicht3d.geklickt.connect(_3d_klick)
+	ansicht3d.ueber.connect(func(t: String) -> void:
+		if t != "": _hinweis.text = t)
+	v.add_child(ansicht3d)
 	var spalten := HBoxContainer.new()
 	spalten.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	spalten.visible = false
+	_liste = spalten
 	v.add_child(spalten)
 	for i in 2:
 		var scroll := ScrollContainer.new()
-		scroll.custom_minimum_size = Vector2(330, 420)
+		scroll.custom_minimum_size = Vector2(400, 450)
 		scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		spalten.add_child(scroll)
 		var box := VBoxContainer.new()
@@ -78,8 +124,74 @@ func oeffnen(id: String) -> void:
 	else:
 		gruppe = [id]
 		_titel.text = "Nahansicht: %s" % id
-	_hinweis.text = "Ader links anklicken, dann eine Klemme rechts. Nur abgemantelte und abisolierte Adern lassen sich anklemmen."
 	show()
+	_aufbauen()
+	modus_setzen(modus)
+
+func modus_setzen(m: int) -> void:
+	modus = m
+	auswahl = {}
+	for k in _modus_knoepfe:
+		_modus_knoepfe[k].button_pressed = k == m
+	match m:
+		Modus.ABMANTELN: _hinweis.text = "① Abmantelungswerkzeug: den grauen Mantel einer Leitung unten anklicken. Geht nur, wenn die Leitung höchstens 10 cm vor dem Gerät befestigt ist."
+		Modus.ABISOLIEREN: _hinweis.text = "② Abisolierzange (%d mm): jede Ader einzeln anklicken. Richtig sind 8 bis 12 mm." % montage.abisolier_mm
+		Modus.ANKLEMMEN: _hinweis.text = "③ Schraubendreher: Ader anklicken, dann die Klemme. Nur abisolierte Adern haben Kontakt."
+	_aufbauen()
+
+func _3d_klick(art: String, d: Dictionary) -> void:
+	match art:
+		"mantel":
+			if modus != Modus.ABMANTELN:
+				_hinweis.text = "Das ist der Mantel von %s. Zum Abmanteln oben „① Abmanteln“ wählen." % d.leitung.id
+				return
+			abmanteln(d.leitung, d.ende)
+		"ader":
+			if modus == Modus.ABISOLIEREN:
+				abisolieren(d.leitung, d.index, d.feld)
+			elif modus == Modus.ANKLEMMEN:
+				_ader_gewaehlt(d.leitung, d.index, d.feld)
+				_hinweis.text = "%s Ader %s gewählt. Jetzt die Klemme anklicken (oder „Ausgewählte Ader lösen“)." % [d.leitung.id, FARBNAME.get(d.leitung.adern[d.index].farbe, "")]
+			else:
+				_hinweis.text = "Die Leitung ist schon abgemantelt. Weiter mit „② Abisolieren“."
+		"klemme":
+			if modus != Modus.ANKLEMMEN:
+				_hinweis.text = "Klemme %s. Zum Anschließen „③ Anklemmen“ wählen." % d.klemme
+				return
+			_klemme_gewaehlt(d.klemme)
+		"bruecke":
+			_bruecke_entfernen(d.leitung)
+
+## Leitungsende abmanteln: nur wenn die Leitung vor dem Geraet befestigt ist
+func abmanteln(l: Dictionary, ende: String) -> bool:
+	if l.abgemantelt.get(ende, false):
+		_hinweis.text = "%s ist hier schon abgemantelt. Weiter mit „② Abisolieren“." % l.id
+		return false
+	var abst := Circuit.abstand_befestigung(l, ende)
+	if abst > Circuit.MAX_ENDABSTAND + 0.001:
+		_hinweis.text = "%s ist vor dem Gerät nicht befestigt%s. Erst eine Iso-Schelle höchstens 10 cm vor dem Gerät setzen, dann abmanteln." % [l.id, "" if abst == INF else " (nächste Befestigung %d cm entfernt)" % int(abst * 100)]
+		return false
+	l.abgemantelt[ende] = true
+	_hinweis.text = "%s abgemantelt. Jetzt mit „② Abisolieren“ jede Ader abisolieren." % l.id
+	montage.nahansicht_geaendert()
+	_aufbauen()
+	return true
+
+## Eine Ader abisolieren (Laenge aus der Abisolierzange)
+func abisolieren(l: Dictionary, i: int, feld: String) -> void:
+	var ende := "start" if feld == "von" else "ende"
+	if not l.abgemantelt.get(ende, false):
+		_hinweis.text = "Erst abmanteln! Mit der Abisolierzange kommt man nicht durch den Mantel."
+		return
+	var mm: float = montage.abisolier_mm
+	l.adern[i]["abisoliert_" + feld] = mm
+	var hinweis := ""
+	if mm < Circuit.ABISOLIERLAENGE.x:
+		hinweis = " Zu kurz: die Klemme fasst evtl. nur die Isolierung."
+	elif mm > Circuit.ABISOLIERLAENGE.y:
+		hinweis = " Zu lang: blankes Kupfer schaut aus der Klemme."
+	_hinweis.text = "%s Ader %s: %d mm abisoliert.%s" % [l.id, FARBNAME.get(l.adern[i].farbe, l.adern[i].farbe), mm, hinweis]
+	montage.nahansicht_geaendert()
 	_aufbauen()
 
 func _c() -> Circuit:
@@ -94,6 +206,8 @@ func _aufbauen() -> void:
 	_leeren(_rechts)
 	_leeren(_extra)
 	var typ: String = _c().geraete[geraet].typ
+	if ansicht3d:
+		ansicht3d.aufbauen(_c(), gruppe, auswahl, montage.ADERFARBE, montage.BAUTEILE)
 	if typ == "abzweigdose":
 		var b := Button.new()
 		b.text = "Verbindungsklemme (5-fach) einsetzen"

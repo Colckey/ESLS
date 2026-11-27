@@ -39,16 +39,34 @@ Beim Prüfen leuchtet die Leuchte, Wippen zeigen die Schalterstellung, ein ausge
 
 ## Ablauf einer Montage
 1. **Bohrmaschine**: unter jedes Bauteil 2 Bohrungen, unter jede Schelle 1
-2. **Bauteil setzen**: Kachel links wählen, aufs Brett klicken. FI, LS, Schütz und Relais rasten auf der **Hutschiene** im Verteiler ein (ohne Bohrung)
+2. **Bauteil setzen**: Kachel links wählen, aufs Brett klicken. FI, LS, Schütz und Relais rasten auf der **Hutschiene** im Verteiler ein (ohne Bohrung).
+   Beim Setzen zeigen blaue Hilfslinien, mit welchem Bauteil das neue in einer Flucht sitzt
 3. **Leitung verlegen**: Leitungstyp wählen, Start-Bauteil → Eckpunkte → Ziel-Bauteil. Über den Kabelkanal führen spart Schellen
-4. **Iso-Schelle**: auf die Leitung über einer Bohrung klicken. Max. 25 cm Abstand und max. 10 cm vor dem Gerät, gemessen **entlang der Leitung**. Im Kabelkanal und im Verteiler sind keine Schellen nötig
-5. **Abmantelungswerkzeug**, dann **Abisolierzange** (richtig sind 8–12 mm): Bauteil anklicken
-6. **Schraubendreher**: Bauteil anklicken → Nahansicht → Ader links, Klemme rechts
+4. **Iso-Schelle**: auf die Leitung über einer Bohrung klicken. Max. 25 cm Abstand und max. 10 cm vor dem Gerät, gemessen **entlang der Leitung**.
+   Im Kabelkanal und im Verteiler sind keine Schellen nötig. Die Statuszeile sagt, ob die Leitung fertig befestigt ist
+5. **Abmantelungswerkzeug**: Gerät anklicken, an dem die Leitung endet → 3D-Anschlussansicht → grauen Mantel anklicken.
+   **Geht erst, wenn die Leitung höchstens 10 cm vor dem Gerät befestigt ist.** Auf dem Brett sieht man danach die bunten Adern
+6. **Abisolierzange** (Länge rechts einstellen, richtig sind 8–12 mm): in der 3D-Ansicht **jede Ader einzeln** anklicken, das blanke Kupfer wird sichtbar
+7. **Schraubendreher**: in der 3D-Ansicht erst die Ader, dann die Klemme anklicken. Die Ader läuft dann sichtbar in die Klemme.
+   Rechte Maustaste dreht die Ansicht, Mausrad zoomt. „Liste“ zeigt statt 3D die alte Listenansicht
    - Verteiler: Brücken mit H07V-K legen (zwei Klemmen nacheinander), N- und PE-Klemmen nutzen
    - Abzweigdose: Verbindungsklemmen einsetzen
-7. **✔ Prüfen** (Taste P): Fehler, Warnungen und **Selbstkontrolle gegen den Auftrag** mit vorläufiger Note.
+8. **✔ Prüfen** (Taste P): Fehler, Warnungen und **Selbstkontrolle gegen den Auftrag** mit vorläufiger Note.
    Schalter mit **Auswahl** anklicken und **Leertaste** drücken. Treppenlicht geht nach 30 s wieder aus
-8. **Speichern** (`.esim`) – die Datei enthält Name und Auftrag
+9. **Speichern** (`.esim`) – die Datei enthält Name und Auftrag
+
+![3D-Anschlussansicht beim Abisolieren](docs/anschluss3d_abisolieren.png)
+![3D-Anschlussansicht angeklemmt](docs/anschluss3d_angeklemmt.png)
+![Abgemantelte Leitung auf dem Brett](docs/abgemantelt_brett.png)
+
+### Messen und Ausrichten
+- **Zollstock** (Taste 9): Start- und Endpunkt anklicken, angezeigt werden Abstand, waagerecht und senkrecht in cm
+- **Wasserwaage** (Taste 0): zwei Bauteile anklicken. Die Blase zeigt, ob sie genau waagerecht/senkrecht sitzen, sonst den Versatz in cm
+- **Raster** (Taste R oder Knopf rechts): 1-cm-Linien, kräftig alle 10 cm, Zahlen = cm vom linken und oberen Brettrand
+- **Bauplan** (Taste B): blaue Umrisse zeigen, wo die Bauteile laut Auftrag sitzen, mit Maßen in cm. Beim Übungsbrett genau wie auf dem Foto
+
+![Raster, Zollstock und Wasserwaage](docs/raster_zollstock_wasserwaage.png)
+![Bauplan mit Raster](docs/bauplan_raster.png)
 
 ![Prüfergebnis](docs/pruefergebnis.png)
 
