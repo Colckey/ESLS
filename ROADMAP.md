@@ -6,14 +6,15 @@ Status: ✅ fertig · 🔧 in Arbeit · ⬜ offen
 |---|---|---|---|
 | 0 | Grundlagen | Godot 4.7, 3D im Kompatibilitätsmodus für schwache Schul-PCs, Performancetest | ✅ |
 | 1 | Prüflogik & Speichern | LS fliegt bei Kurzschluss, FI bei Fehlerstrom/N-PE, PE-Prüfung, Aderfarben, Querschnitt zu LS, Abmanteln/Abisolieren nötig für Kontakt, Schellenabstand, `.esim`-Datei mit Prüfsumme, auf anderem PC ladbar | ✅ |
-| 2 | Brett & Bohren | Montagebrett, Werkzeugkasten-Leiste, Bohrmaschine setzt Bohrungen, Bauteile auf Brett platzieren | 🔧 erste Version (`montage.tscn`) |
+| 2 | Brett & Bohren | Montagebrett, Werkzeugkasten-Leiste, Bohrmaschine setzt Bohrungen, Bauteile auf Brett platzieren | ✅ Übungsbrett wie in der Werkstatt (Kanal, Verteiler, CEE), Hutschiene |
 | 3 | Leitung ziehen | Kabelwahl (NYM-J 3x1,5 / 5x1,5 / 3x2,5 / 5x2,5, Steuerleitung), Leitung Punkt für Punkt verlegen, Iso-Schellen setzen, Seitenschneider zum Ablängen | 🔧 erste Version |
 | 4 | Abmanteln & Abisolieren | Abmantelungswerkzeug und Abisolierzange mit Längenwahl, sichtbare Adern in Normfarben | 🔧 erste Version |
 | 5 | Nahansicht Anklemmen | Kamera zoomt an Bauteil, Adern einzeln in Klemmen stecken, Schraubendreher | 🔧 erste Version (Fenster-Nahansicht) |
-| 6 | Installationsgeräte 3D | FI, LS, Ausschalter, Wechsel-/Kreuzschalter, Schuko-Steckdose, Abzweigdose mit Klemmen, Lampe | ⬜ |
-| 7 | Prüfen in 3D | Prüfknopf, Schalter bedienen, Lampe leuchtet, LS/FI kippen sichtbar, Fehlerliste | 🔧 Lampe leuchtet, ausgelöste Geräte rot, Leertaste schaltet |
-| 8 | Steuerungstechnik | Schütz, Zeitrelais (Treppenlicht), Stromstoßschalter, Steuerleitung | 🔧 Schütz mit Selbsthaltung, Taster, Kreuzschalter, Zeitrelais (ohne Zeitlauf); offen: Stromstoß, Treppenlicht |
-| 9 | Lehrermodus | Aufgaben anlegen, Schülerdatei öffnen, automatisch bewerten, Manipulationshinweis | 🔧 `lehrer.tscn`: Schülerdatei + Musterlösung öffnen, Punkte/Note, Fehlerliste, Funktionstabelle |
+| 6 | Installationsgeräte 3D | FI, LS, Ausschalter, Wechsel-/Kreuzschalter, Schuko-Steckdose, Abzweigdose mit Klemmen, Lampe | ✅ Modelle aus Grundkörpern, Wippe/Hebel/Leuchte zeigen den Zustand |
+| 7 | Prüfen in 3D | Prüfknopf, Schalter bedienen, Lampe leuchtet, LS/FI kippen sichtbar, Fehlerliste | ✅ inkl. Selbstkontrolle gegen den Auftrag |
+| 8 | Steuerungstechnik | Schütz, Zeitrelais (Treppenlicht), Stromstoßschalter, Steuerleitung | 🔧 Schütz mit Selbsthaltung, Taster, Kreuzschalter, Zeitrelais (ohne Zeitlauf); Treppenlichtautomat mit Nachlaufzeit; offen: Stromstoßschalter |
+| 9 | Lehrermodus | Aufgaben anlegen, Schülerdatei öffnen, automatisch bewerten, Manipulationshinweis | 🔧 7 eingebaute Aufträge mit Musterlösung, Bewertung ohne eigene Musterdatei; offen: Aufträge im Programm selbst anlegen |
+| 11 | Lernprogramm | Startbildschirm, Aufträge mit Lernzielen und Tipps, Arbeitsschritte zum Abhaken, Erklärungen zu Bauteilen | ✅ |
 | 10 | Windows-Export | Portable .exe ohne Installation, Test auf Schulrechner | 🔧 Export-Voreinstellung + `build_windows.bat` fertig, noch nicht gebaut |
 
 
@@ -22,6 +23,8 @@ Status: ✅ fertig · 🔧 in Arbeit · ⬜ offen
 - Rechte Maustaste ziehen = schwenken, mittlere = verschieben, Mausrad = Zoom
 - Leitung: Start-Bauteil anklicken → Eckpunkte → Ziel-Bauteil anklicken, Esc bricht ab
 - Entf löscht das ausgewählte Bauteil
+- Abmanteln, Abisolieren und Anklemmen in der 3D-Anschlussansicht (Gerät anklicken)
+- Tasten 9/0: Zollstock/Wasserwaage, R: Raster, B: Bauplan
 
 Tests: `sim_test.tscn` (Prüflogik) und `montage_test.tscn` (Montage) mit F6.
 Performancetest: `perf_test.tscn`.

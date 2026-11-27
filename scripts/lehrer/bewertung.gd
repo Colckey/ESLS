@@ -8,6 +8,7 @@ extends RefCounted
 const ABZUG_FEHLER := 10
 const ABZUG_WARNUNG := 3
 const ABZUG_FUNKTION := 40
+const ABZUG_ANFORDERUNG := 15
 
 const SCHALTER_TYPEN := ["ausschalter", "wechselschalter", "kreuzschalter", "taster", "taster_aus"]
 
@@ -35,7 +36,9 @@ static func tabelle(original: Circuit) -> Dictionary:
 		var r := c.pruefen()
 		var lampen: Array = r.lampen_an.duplicate()
 		lampen.sort()
-		zeilen.append({"stellung": stellung, "lampen": lampen, "ausgeloest": r.ausgeloest})
+		var dosen: Array = r.get("steckdosen_an", []).duplicate()
+		dosen.sort()
+		zeilen.append({"stellung": stellung, "lampen": lampen, "steckdosen": dosen, "ausgeloest": r.ausgeloest})
 	return {"schalter": schalter.slice(0, n), "zeilen": zeilen}
 
 ## Vergleicht zwei Funktionstabellen. Schalter werden ueber alle Zuordnungen gleichen Typs
@@ -62,7 +65,8 @@ static func gleiche_funktion(schueler: Circuit, muster: Circuit) -> bool:
 			for i in perm.size():
 				maske |= int(zm.stellung[i]) << perm[i]
 			var zs: Dictionary = ts.zeilen[maske]
-			if zs.lampen.size() != zm.lampen.size() or zs.ausgeloest.is_empty() != zm.ausgeloest.is_empty():
+			if zs.lampen.size() != zm.lampen.size() or zs.ausgeloest.is_empty() != zm.ausgeloest.is_empty() \
+					or zs.get("steckdosen", []).size() != zm.get("steckdosen", []).size():
 				alle_gleich = false
 				break
 		if alle_gleich:
@@ -80,11 +84,16 @@ static func _permutationen(elemente: Array) -> Array:
 			r.append([e] + p)
 	return r
 
-## Gesamtbewertung: {punkte (0-100), note (1-6), fehler, warnungen, funktion_ok (bool oder null), tabelle}
-static func bewerten(schueler: Circuit, muster: Circuit = null) -> Dictionary:
+## Gesamtbewertung: {punkte (0-100), note (1-6), fehler, warnungen, anforderungen, funktion_ok (bool oder null), tabelle}
+## aufgabe: id aus Aufgaben.LISTE. Ohne eigene Musterloesung wird die eingebaute Musterschaltung verwendet.
+static func bewerten(schueler: Circuit, muster: Circuit = null, aufgabe := "") -> Dictionary:
 	var c := schueler.kopie()
 	var r := c.pruefen()
-	var punkte: int = 100 - ABZUG_FEHLER * r.fehler.size() - ABZUG_WARNUNG * r.warnungen.size()
+	var anforderungen := Aufgaben.anforderungen_pruefen(schueler, aufgabe)
+	var punkte: int = 100 - ABZUG_FEHLER * r.fehler.size() - ABZUG_WARNUNG * r.warnungen.size() \
+		- ABZUG_ANFORDERUNG * anforderungen.size()
+	if muster == null and aufgabe != "":
+		muster = Aufgaben.muster(aufgabe)
 	var funktion_ok = null
 	if muster != null:
 		funktion_ok = gleiche_funktion(schueler, muster)
@@ -92,7 +101,7 @@ static func bewerten(schueler: Circuit, muster: Circuit = null) -> Dictionary:
 			punkte -= ABZUG_FUNKTION
 	punkte = clampi(punkte, 0, 100)
 	return {"punkte": punkte, "note": note(punkte), "fehler": r.fehler, "warnungen": r.warnungen,
-		"funktion_ok": funktion_ok, "tabelle": tabelle(schueler)}
+		"anforderungen": anforderungen, "funktion_ok": funktion_ok, "tabelle": tabelle(schueler)}
 
 ## IHK-uebliche Notenskala
 static func note(punkte: int) -> int:
