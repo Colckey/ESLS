@@ -16,6 +16,10 @@ var _vor: Button
 var _warte := 0.0
 var _fertig_seit := -1.0
 var _zurueck_geblaettert := false
+var _verschoben := false     # vom Benutzer verschoben: Position nicht mehr automatisch setzen
+var _ziehen := false
+var _inhalt: Array = []      # Elemente, die beim Einklappen verschwinden
+var _klapp: Button
 
 const SD_POS := Vector3(-0.18, -0.33, 0)
 
@@ -34,7 +38,17 @@ func _ready() -> void:
 	_kopf = Label.new()
 	_kopf.theme_type_variation = "Leise"
 	_kopf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_kopf.mouse_filter = Control.MOUSE_FILTER_STOP
+	_kopf.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	_kopf.tooltip_text = "Hier festhalten und ziehen, um das Tutorial zu verschieben"
+	_kopf.gui_input.connect(_kopf_eingabe)
 	kz.add_child(_kopf)
+	_klapp = Button.new()
+	_klapp.text = "Einklappen"
+	_klapp.tooltip_text = "Tutorial klein machen, damit du darunter arbeiten kannst"
+	_klapp.focus_mode = Control.FOCUS_NONE
+	_klapp.pressed.connect(_umklappen)
+	kz.add_child(_klapp)
 	var zu := Button.new()
 	zu.text = "Tutorial beenden"
 	zu.focus_mode = Control.FOCUS_NONE
@@ -76,7 +90,24 @@ func _ready() -> void:
 	_vor.focus_mode = Control.FOCUS_NONE
 	_vor.pressed.connect(func() -> void: schritt_zeigen(nr + 1))
 	knoepfe.add_child(_vor)
+	_inhalt = [_titel, _text, _status, knoepfe]
 	schritt_zeigen(0)
+
+## Kopfzeile ziehen = Tutorial verschieben
+func _kopf_eingabe(ev: InputEvent) -> void:
+	if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT:
+		_ziehen = ev.pressed
+	elif ev is InputEventMouseMotion and _ziehen:
+		_verschoben = true
+		var vp := get_viewport_rect().size
+		position = (position + ev.relative).clamp(Vector2.ZERO, vp - Vector2(120, 40))
+
+func _umklappen() -> void:
+	var zeigen := not _titel.visible
+	for c in _inhalt:
+		(c as Control).visible = zeigen
+	_klapp.text = "Einklappen" if zeigen else "Ausklappen"
+	reset_size()
 
 func anzahl() -> int:
 	return _schritte.size()
@@ -86,7 +117,7 @@ func schritt_zeigen(i: int) -> void:
 	_zurueck_geblaettert = false
 	_fertig_seit = -1.0
 	var s: Dictionary = _schritte[nr]
-	_kopf.text = "Tutorial · Schritt %d von %d" % [nr + 1, _schritte.size()]
+	_kopf.text = "Tutorial · Schritt %d von %d   (hier ziehen zum Verschieben)" % [nr + 1, _schritte.size()]
 	_titel.text = s.titel
 	_text.text = s.text + ("\n\n[color=#5a6270]Werkzeug: [b]%s[/b][/color]" % s.werkzeug if s.has("werkzeug") else "")
 	_zurueck.disabled = nr == 0
@@ -125,8 +156,9 @@ func _process(dt: float) -> void:
 		return
 	_warte = 0.0
 	# Liegt die 3D-Ansicht offen, rutscht das Tutorial nach links ueber die Bauteil-Leiste
-	var nah_offen: bool = m.nahansicht != null and m.nahansicht.visible
-	position.x = 8.0 if nah_offen else float(m.PANEL_BREITE + 12)
+	if not _verschoben:
+		var nah_offen: bool = m.nahansicht != null and m.nahansicht.visible
+		position.x = 8.0 if nah_offen else float(m.PANEL_BREITE + 12)
 	move_to_front()
 	_pruefen_jetzt()
 	if _fertig_seit >= 0.0:
